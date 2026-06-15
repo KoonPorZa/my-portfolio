@@ -22,7 +22,7 @@ export const profile = {
   // Concise (~150 char) summary used for SEO meta + social descriptions.
   tagline:
     "Backend developer from Bangkok building scalable APIs with NestJS, SQL & NoSQL data modeling, and Redis-backed infrastructure.",
-  twitter: "@koon_por_za", // X handle for the twitter:creator tag
+  twitter: "@KoonPorZa", // X handle for the twitter:creator tag
   email: "Patipol.Pantarat@gmail.com",
   resumeUrl: "", // drop a resume.pdf in /public and set "/resume.pdf" to show the button
 };
@@ -115,8 +115,8 @@ export type LinkItem = {
 export const links: LinkItem[] = [
   // GitHub: LIVE (real account, no API key) → pulls avatar + repos + followers.
   { label: "GitHub", handle: "@KoonPorZa", href: "https://github.com/KoonPorZa", icon: "github", accent: "cyan", live: "github", ref: "KoonPorZa" },
-  // X: no practical public API → set `manual` if you want a stat line. href is a mock guess.
-  { label: "X", handle: "@koon_por_za", href: "https://x.com/koon_por_za", icon: "x", accent: "magenta" },
+  // X: no practical public API → set `manual` if you want a stat line.
+  { label: "X", handle: "@KoonPorZa", href: "https://x.com/KoonPorZa", icon: "x", accent: "magenta" },
   // YouTube: LIVE once you set YOUTUBE_API_KEY in .env and the real channel in `ref` (@handle or UC… id).
   { label: "YouTube", handle: "@koonporza", href: "https://youtube.com/@koonporza", icon: "youtube", accent: "magenta", live: "youtube", ref: "@koonporza" },
   // Instagram: real account. No public API → use `manual` for a follower count if you like.
