@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { profile } from "@/lib/data";
+import { profile, stack } from "@/lib/data";
 import { Grain } from "@/components/ui/grain";
 import { Nav } from "@/components/nav";
 
@@ -20,19 +20,47 @@ const mono = JetBrains_Mono({
 });
 
 const title = `${profile.handle} — ${profile.role}`;
+const url = `https://${profile.domain}`;
+
+// Tech names from the stack power the keyword list (kept data-driven).
+const keywords = [
+  profile.name,
+  profile.handle,
+  profile.role,
+  "Portfolio",
+  ...stack.flatMap((g) => g.items),
+];
 
 export const metadata: Metadata = {
-  metadataBase: new URL(`https://${profile.domain}`),
+  metadataBase: new URL(url),
   title: { default: title, template: `%s · ${profile.handle}` },
-  description: profile.bio,
+  description: profile.tagline,
+  keywords,
+  applicationName: profile.handle,
+  authors: [{ name: profile.name, url }],
+  creator: profile.name,
+  publisher: profile.name,
+  category: "technology",
+  alternates: { canonical: "/" },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
   openGraph: {
     title,
-    description: profile.bio,
-    url: `https://${profile.domain}`,
+    description: profile.tagline,
+    url,
     siteName: profile.handle,
+    locale: "en_US",
     type: "website",
   },
-  twitter: { card: "summary_large_image", title, description: profile.bio },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description: profile.tagline,
+    creator: profile.twitter,
+  },
 };
 
 export const viewport: Viewport = {

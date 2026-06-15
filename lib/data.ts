@@ -19,6 +19,10 @@ export const profile = {
   location: "Bangkok, TH",
   status: "online" as "online" | "away" | "offline",
   bio: "Backend-leaning developer from Bangkok. I live in the server layer — designing clean APIs with NestJS, modeling data across SQL and NoSQL, and keeping things fast with Redis and solid infra. Comfortable across the whole stack with React/Next when a project needs it end to end.",
+  // Concise (~150 char) summary used for SEO meta + social descriptions.
+  tagline:
+    "Backend developer from Bangkok building scalable APIs with NestJS, SQL & NoSQL data modeling, and Redis-backed infrastructure.",
+  twitter: "@koon_por_za", // X handle for the twitter:creator tag
   email: "Patipol.Pantarat@gmail.com",
   resumeUrl: "", // drop a resume.pdf in /public and set "/resume.pdf" to show the button
 };
