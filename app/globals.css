@@ -68,28 +68,20 @@ body::after {
   inset: 0;
   z-index: -1;
   pointer-events: none;
+  /* faint HUD grid + CRT scanlines — behind content, so cards/photos stay crisp */
   background-image:
+    repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 0, rgba(255, 255, 255, 0.018) 1px, transparent 1px, transparent 3px),
     linear-gradient(to right, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
-  background-size: 46px 46px;
+  background-size: 100% 3px, 46px 46px, 46px 46px;
   -webkit-mask-image: radial-gradient(circle at 50% 25%, black, transparent 78%);
   mask-image: radial-gradient(circle at 50% 25%, black, transparent 78%);
 }
 
-/* ── Overlay: grain + scanlines + vignette (Grain component) ─────────── */
+/* ── Overlay: grain + vignette (Grain component) ─────────────────────── */
 .grain {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
   background-size: 140px 140px;
-}
-.scanlines {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0) 0,
-    rgba(0, 0, 0, 0) 2px,
-    rgba(0, 0, 0, 0.5) 3px,
-    rgba(0, 0, 0, 0) 4px
-  );
-  background-size: 100% 4px;
 }
 .vignette {
   box-shadow: inset 0 0 180px 36px rgba(0, 0, 0, 0.65);
