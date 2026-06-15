@@ -101,14 +101,23 @@ export type LinkItem = {
   href: string;
   icon: string; // key in components/ui/social-icon.tsx
   accent: Accent;
+  // Live profile fetch (server-side, see lib/social.ts). Omit for static tiles.
+  live?: "github" | "youtube" | "discord";
+  ref?: string; // github username | youtube @handle/UC… id | discord server id
+  manual?: string; // static stat line for platforms with no live API (e.g. "12.4K followers")
 };
 
 export const links: LinkItem[] = [
-  { label: "GitHub", handle: "@koonporza", href: "https://github.com/", icon: "github", accent: "cyan" },
-  { label: "X", handle: "@koonporza", href: "https://x.com/", icon: "x", accent: "magenta" },
-  { label: "YouTube", handle: "Koonporza", href: "https://youtube.com/", icon: "youtube", accent: "magenta" },
-  { label: "Instagram", handle: "@koonporza", href: "https://instagram.com/", icon: "instagram", accent: "cyan" },
-  { label: "Discord", handle: "koonporza", href: "https://discord.com/", icon: "discord", accent: "lime" },
+  // GitHub: LIVE (real account, no API key) → pulls avatar + repos + followers.
+  { label: "GitHub", handle: "@KoonPorZa", href: "https://github.com/KoonPorZa", icon: "github", accent: "cyan", live: "github", ref: "KoonPorZa" },
+  // X: no practical public API → set `manual` if you want a stat line. href is a mock guess.
+  { label: "X", handle: "@koon_por_za", href: "https://x.com/koon_por_za", icon: "x", accent: "magenta" },
+  // YouTube: LIVE once you set YOUTUBE_API_KEY in .env and the real channel in `ref` (@handle or UC… id).
+  { label: "YouTube", handle: "@koonporza", href: "https://youtube.com/@koonporza", icon: "youtube", accent: "magenta", live: "youtube", ref: "@koonporza" },
+  // Instagram: real account. No public API → use `manual` for a follower count if you like.
+  { label: "Instagram", handle: "@koon_por_za", href: "https://www.instagram.com/koon_por_za/", icon: "instagram", accent: "cyan" },
+  // Discord: set `ref` to your server id + enable the server Widget to show online count.
+  { label: "Discord", handle: "koon_por_za", href: "https://discord.com/", icon: "discord", accent: "lime", live: "discord", ref: "" },
   { label: "Email", handle: "me@koonporza.com", href: "mailto:me@koonporza.com", icon: "mail", accent: "cyan" },
 ];
 
