@@ -12,7 +12,7 @@ export function Projects() {
 
       <div className="mt-10 grid gap-5 sm:grid-cols-2">
         {projects.map((p, i) => (
-          <Reveal key={p.id} delay={0.06 * i}>
+          <Reveal key={p.id} delay={0.06 * i} className="h-full">
             <ProjectCard project={p} />
           </Reveal>
         ))}

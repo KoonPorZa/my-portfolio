@@ -15,7 +15,7 @@ export function ProjectCard({ project }: { project: Project }) {
   const a = ACCENT[project.accent];
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden border border-line bg-panel p-6 transition-all duration-300 hover:-translate-y-1.5 ${a.border} ${a.glow}`}
+      className={`group relative flex h-full flex-col overflow-hidden border border-line bg-panel p-6 transition-all duration-300 hover:-translate-y-1.5 ${a.border} ${a.glow}`}
     >
       {/* top accent line */}
       <span

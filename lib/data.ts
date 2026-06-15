@@ -19,15 +19,15 @@ export const profile = {
   location: "Bangkok, TH",
   status: "online" as "online" | "away" | "offline",
   bio: "Backend-leaning developer from Bangkok. I live in the server layer — designing clean APIs with NestJS, modeling data across SQL and NoSQL, and keeping things fast with Redis and solid infra. Comfortable across the whole stack with React/Next when a project needs it end to end.",
-  email: "me@koonporza.com",
+  email: "Patipol.Pantarat@gmail.com",
   resumeUrl: "", // drop a resume.pdf in /public and set "/resume.pdf" to show the button
 };
 
 // Tech chips under the About section, grouped by area (backend-first).
 export const stack: { group: string; items: string[] }[] = [
   { group: "Backend", items: ["NestJS", "Node.js", "TypeScript", "REST APIs"] },
-  { group: "Data & Cache", items: ["PostgreSQL", "MySQL", "Redis", "NoSQL", "Supabase", "Firebase"] },
-  { group: "Frontend", items: ["React", "Next.js", "Tailwind", "shadcn/ui", "MUI", "Redux", "TanStack Query"] },
+  { group: "Data & Cache", items: ["PostgreSQL", "MySQL", "Redis", "Supabase", "Firebase"] },
+  { group: "Frontend", items: ["React", "Next.js", "Tailwind", "shadcn/ui", "MUI", "Redux"] },
   { group: "DevOps & Infra", items: ["Docker", "GitHub", "GitLab", "Vercel", "Cloudflare R2", "Claude Code"] },
 ];
 
@@ -119,7 +119,7 @@ export const links: LinkItem[] = [
   { label: "Instagram", handle: "@koon_por_za", href: "https://www.instagram.com/koon_por_za/", icon: "instagram", accent: "cyan" },
   // Discord: set `ref` to your server id + enable the server Widget to show online count.
   { label: "Discord", handle: "koon_por_za", href: "https://discord.com/", icon: "discord", accent: "lime", live: "discord", ref: "" },
-  { label: "Email", handle: "me@koonporza.com", href: "mailto:me@koonporza.com", icon: "mail", accent: "cyan" },
+  { label: "Email", handle: "Patipol.Pantarat@gmail.com", href: "mailto:Patipol.Pantarat@gmail.com", icon: "mail", accent: "cyan" },
 ];
 
 export const nav = [

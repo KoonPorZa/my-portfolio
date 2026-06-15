@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
-import { profile, stack, skills } from "@/lib/data";
+import { profile, skills } from "@/lib/data";
 import { Reveal } from "@/components/ui/reveal";
 import { GlowButton } from "@/components/ui/glow-button";
+import { TechMarquee } from "@/components/tech-marquee";
 
 const BAR: Record<string, string> = {
   cyan: "bg-cyan shadow-[0_0_10px_var(--color-cyan)]",
@@ -20,26 +21,6 @@ export function About() {
         <Reveal delay={0.05}>
           <div>
             <p className="font-display text-xl leading-relaxed text-hi sm:text-2xl">{profile.bio}</p>
-
-            <div className="mt-8 space-y-4">
-              {stack.map((grp) => (
-                <div key={grp.group}>
-                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-cyan/70">
-                    {grp.group}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {grp.items.map((s) => (
-                      <span
-                        key={s}
-                        className="border border-line bg-panel px-3 py-1 font-mono text-xs text-fg transition-colors hover:border-cyan/50 hover:text-cyan"
-                      >
-                        {s}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
 
             {profile.resumeUrl && (
               <div className="mt-8">
@@ -71,6 +52,13 @@ export function About() {
           </div>
         </Reveal>
       </div>
+
+      <Reveal delay={0.05}>
+        <p className="mt-16 font-mono text-[10px] uppercase tracking-[0.3em] text-dim">
+          <span className="text-cyan">{"//"}</span> stack
+        </p>
+        <TechMarquee />
+      </Reveal>
     </section>
   );
 }
@@ -80,7 +68,7 @@ export function SectionLabel({ index, title }: { index: string; title: string })
     <div className="flex items-center gap-4">
       <span className="font-mono text-xs text-cyan">{index}</span>
       <h2 className="font-display text-sm font-semibold uppercase tracking-[0.25em] text-dim">
-        <span className="text-cyan">//</span> {title}
+        <span className="text-cyan">{"//"}</span> {title}
       </h2>
       <span className="h-px flex-1 bg-gradient-to-r from-line to-transparent" />
     </div>
