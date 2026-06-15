@@ -8,34 +8,35 @@ export const profile = {
   handle: "koonporza",
   domain: "koonporza.com",
   name: "Koonporza",
-  role: "Developer & Creator",
+  role: "Backend Developer",
   // shown in the hero terminal, typed out one phrase at a time
-  typed: ["building cool stuff", "shipping side projects", "playing & making games"],
+  typed: [
+    "designing APIs that scale",
+    "modeling data across SQL & NoSQL",
+    "keeping things fast with Redis",
+    "backend-heavy, full-stack when needed",
+  ],
   location: "Bangkok, TH",
   status: "online" as "online" | "away" | "offline",
-  bio: "Self-taught dev who lives between the editor and the game lobby. I build playful web things, automate the boring parts, and chase that one more commit before sleep.",
+  bio: "Backend-leaning developer from Bangkok. I live in the server layer — designing clean APIs with NestJS, modeling data across SQL and NoSQL, and keeping things fast with Redis and solid infra. Comfortable across the whole stack with React/Next when a project needs it end to end.",
   email: "me@koonporza.com",
-  resumeUrl: "/resume.pdf", // drop a resume.pdf in /public to enable
+  resumeUrl: "", // drop a resume.pdf in /public and set "/resume.pdf" to show the button
 };
 
-// Tech chips under the About section
-export const stack: string[] = [
-  "TypeScript",
-  "Next.js",
-  "React",
-  "Tailwind",
-  "Node.js",
-  "Python",
-  "PostgreSQL",
-  "Figma",
+// Tech chips under the About section, grouped by area (backend-first).
+export const stack: { group: string; items: string[] }[] = [
+  { group: "Backend", items: ["NestJS", "Node.js", "TypeScript", "REST APIs"] },
+  { group: "Data & Cache", items: ["PostgreSQL", "MySQL", "Redis", "NoSQL", "Supabase", "Firebase"] },
+  { group: "Frontend", items: ["React", "Next.js", "Tailwind", "shadcn/ui", "MUI", "Redux", "TanStack Query"] },
+  { group: "DevOps & Infra", items: ["Docker", "GitHub", "GitLab", "Vercel", "Cloudflare R2", "Claude Code"] },
 ];
 
 // Animated skill bars (level 0–100)
 export const skills: { label: string; level: number; accent: Accent }[] = [
-  { label: "Frontend", level: 90, accent: "cyan" },
-  { label: "Backend", level: 75, accent: "magenta" },
-  { label: "UI / UX", level: 80, accent: "cyan" },
-  { label: "Game dev", level: 60, accent: "lime" },
+  { label: "Backend & APIs", level: 90, accent: "cyan" },
+  { label: "Databases & Caching", level: 88, accent: "magenta" },
+  { label: "DevOps & Infra", level: 78, accent: "lime" },
+  { label: "Frontend", level: 72, accent: "cyan" },
 ];
 
 export type Project = {
@@ -52,10 +53,10 @@ export type Project = {
 export const projects: Project[] = [
   {
     id: "01",
-    title: "Neon Arcade",
+    title: "Commerce API",
     description:
-      "A browser mini-game collection with online leaderboards and a CRT shader. Built for fun, kept for the dopamine.",
-    tags: ["Next.js", "Canvas", "Supabase"],
+      "Modular NestJS backend for an online store — catalog, cart, orders and payments. PostgreSQL with Prisma, Redis caching, and background queue workers for the heavy lifting.",
+    tags: ["NestJS", "PostgreSQL", "Redis"],
     href: "#",
     repo: "#",
     year: "2026",
@@ -63,10 +64,10 @@ export const projects: Project[] = [
   },
   {
     id: "02",
-    title: "Loot Tracker",
+    title: "Realtime Sync Service",
     description:
-      "Real-time inventory + price tracker for in-game markets. Pulls APIs, charts trends, pings you on price drops.",
-    tags: ["React", "WebSocket", "Recharts"],
+      "WebSocket gateway with Redis pub/sub powering live updates, presence and push notifications across web and mobile clients.",
+    tags: ["NestJS", "WebSocket", "Redis"],
     href: "#",
     repo: "#",
     year: "2025",
@@ -74,10 +75,10 @@ export const projects: Project[] = [
   },
   {
     id: "03",
-    title: "devbot",
+    title: "Media Pipeline",
     description:
-      "A Discord bot that runs my CI, posts deploy logs, and roasts failing builds. Surprisingly motivating.",
-    tags: ["Node.js", "Discord.js", "Docker"],
+      "Upload + transform service backed by Cloudflare R2 — signed URLs, async processing, and a thin API that keeps storage costs low.",
+    tags: ["Node.js", "Cloudflare R2", "Docker"],
     repo: "#",
     year: "2025",
     accent: "lime",
@@ -86,10 +87,10 @@ export const projects: Project[] = [
     id: "04",
     title: "koonporza.com",
     description:
-      "This site. Cyberpunk portfolio + link-in-bio, hand-built with a neon dark design system.",
-    tags: ["Next.js", "Tailwind", "Motion"],
-    href: "#",
-    repo: "#",
+      "This site. Neon-dark portfolio + link-in-bio, hand-built on Next.js with live social stats fetched server-side.",
+    tags: ["Next.js", "Tailwind", "Vercel"],
+    href: "https://koonporza.com",
+    repo: "https://github.com/KoonPorZa/portfolio-koonporza",
     year: "2026",
     accent: "cyan",
   },

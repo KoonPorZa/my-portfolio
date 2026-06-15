@@ -21,14 +21,23 @@ export function About() {
           <div>
             <p className="font-display text-xl leading-relaxed text-hi sm:text-2xl">{profile.bio}</p>
 
-            <div className="mt-8 flex flex-wrap gap-2">
-              {stack.map((s) => (
-                <span
-                  key={s}
-                  className="border border-line bg-panel px-3 py-1 font-mono text-xs text-fg transition-colors hover:border-cyan/50 hover:text-cyan"
-                >
-                  {s}
-                </span>
+            <div className="mt-8 space-y-4">
+              {stack.map((grp) => (
+                <div key={grp.group}>
+                  <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-cyan/70">
+                    {grp.group}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {grp.items.map((s) => (
+                      <span
+                        key={s}
+                        className="border border-line bg-panel px-3 py-1 font-mono text-xs text-fg transition-colors hover:border-cyan/50 hover:text-cyan"
+                      >
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
 
