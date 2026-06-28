@@ -7,7 +7,7 @@ import { Grain } from "@/components/ui/grain";
 export function SiteChrome() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/trip-01")) {
+  if (pathname.startsWith("/trip/")) {
     return null;
   }
 

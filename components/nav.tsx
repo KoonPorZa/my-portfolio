@@ -8,7 +8,7 @@ export function Nav() {
   const pathname = usePathname();
   const [active, setActive] = useState("home");
   const [scrolled, setScrolled] = useState(false);
-  const hideNav = pathname.startsWith("/trip-01");
+  const hideNav = pathname.startsWith("/trip/");
 
   useEffect(() => {
     if (hideNav) return;
