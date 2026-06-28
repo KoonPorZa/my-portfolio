@@ -485,9 +485,14 @@ function formatTimestamp(value: string): string {
     return "ไม่ทราบเวลา";
   }
 
+  // Note: dateStyle/timeStyle cannot be combined with timeZoneName (throws
+  // "Invalid option"), so use explicit components to keep the tz abbreviation.
   return new Intl.DateTimeFormat("th-TH", {
-    dateStyle: "medium",
-    timeStyle: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
     timeZoneName: "short",
   }).format(date);
 }
