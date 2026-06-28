@@ -72,12 +72,6 @@
   padding: max(18px, env(safe-area-inset-top)) 16px calc(56px + env(safe-area-inset-bottom));
 }
 
-.tripPageLocked {
-  pointer-events: none;
-  user-select: none;
-  opacity: 0;
-}
-
 /* ---------------- Hero ---------------- */
 
 .hero {
@@ -188,7 +182,6 @@
 
 .primaryButton,
 .ghostButton,
-.showButton,
 .mapLink {
   display: inline-flex;
   align-items: center;
@@ -232,7 +225,6 @@
 
 .primaryButton:active,
 .ghostButton:active,
-.showButton:active,
 .mapLink:active {
   transform: translateY(1px);
 }
@@ -882,108 +874,6 @@
   color: var(--muted);
 }
 
-/* ---------------- Password gate ---------------- */
-
-.gateOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  min-height: 100dvh;
-  padding: 18px;
-  background:
-    radial-gradient(110% 70% at 50% 0%, rgba(255, 252, 244, 0.96), transparent 60%),
-    var(--paper);
-}
-
-.gateCard {
-  width: min(100%, 410px);
-  border: 1px solid var(--line-strong);
-  border-radius: 20px;
-  padding: 26px 24px;
-  background: var(--card);
-  box-shadow: var(--shadow);
-}
-
-.gateBadge {
-  display: inline-block;
-  font-family: var(--trip-mono);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent-deep);
-}
-
-.gateTitle {
-  margin: 14px 0 0;
-  color: var(--ink);
-  font-size: clamp(1.9rem, 9vw, 2.6rem);
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.gateText {
-  margin: 12px 0 0;
-  font-size: 0.95rem;
-  color: var(--ink-soft);
-}
-
-.inputLabel {
-  display: block;
-  margin-top: 20px;
-  font-family: var(--trip-mono);
-  font-size: 0.74rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.passwordField {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.passwordInput {
-  min-width: 0;
-  min-height: 50px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: 12px;
-  background: var(--paper);
-  color: var(--ink);
-  padding: 0 14px;
-  font-family: var(--trip-mono);
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-}
-
-.passwordInput:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.showButton {
-  min-width: 70px;
-  background: var(--card-2);
-  border-color: var(--line-strong);
-  color: var(--ink);
-  font-size: 0.9rem;
-}
-
-.errorMessage {
-  min-height: 1.4em;
-  margin: 9px 0 14px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--danger);
-}
-
 /* ---------------- Responsive ---------------- */
 
 @media (min-width: 600px) {
@@ -1031,7 +921,6 @@
 @media (prefers-reduced-motion: reduce) {
   .primaryButton,
   .ghostButton,
-  .showButton,
   .mapLink,
   .check,
   .checkBox,
@@ -1043,7 +932,6 @@
 /* ---------------- Print ---------------- */
 
 @media print {
-  .gateOverlay,
   .heroActions,
   .mapLink {
     display: none !important;
@@ -1052,10 +940,6 @@
   .tripRoot {
     background: #fff;
     color: #000;
-  }
-
-  .tripPageLocked {
-    opacity: 1;
   }
 
   .stopCard,

@@ -1,6 +1,5 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
 import styles from "./trip.module.css";
 
 type Stop = {
@@ -24,7 +23,6 @@ type TimedStop = Stop & {
   restLabel: string;
 };
 
-const PASSWORD = "1942";
 const START_MINUTES = 4 * 60;
 
 const stops: Stop[] = [
@@ -252,71 +250,6 @@ function Tag({ label }: { label: string }) {
   return <span className={cx(styles.tag, tone)}>{label}</span>;
 }
 
-function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
-  const [value, setValue] = useState("");
-  const [show, setShow] = useState(false);
-  const [error, setError] = useState("");
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (value === PASSWORD) {
-      onUnlock();
-      return;
-    }
-
-    setValue("");
-    setError("รหัสไม่ถูกต้อง — ลองกรอกอีกครั้ง");
-  }
-
-  return (
-    <div className={styles.gateOverlay}>
-      <form className={styles.gateCard} onSubmit={submit}>
-        <span className={styles.gateBadge}>PRIVATE · TRIP 01</span>
-        <h1 className={styles.gateTitle}>ใส่รหัสผ่าน</h1>
-        <p className={styles.gateText}>
-          หน้านี้ทำไว้เปิดตอนเดินทางจริง กรอกรหัสเพื่อดูแผนทริปแบบมือถือ
-        </p>
-
-        <label htmlFor="trip-password" className={styles.inputLabel}>
-          Password
-        </label>
-        <div className={styles.passwordField}>
-          <input
-            id="trip-password"
-            type={show ? "text" : "password"}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            autoComplete="off"
-            autoFocus
-            value={value}
-            aria-invalid={Boolean(error)}
-            aria-describedby="trip-password-error"
-            onChange={(event) => {
-              setValue(event.target.value);
-              setError("");
-            }}
-            className={styles.passwordInput}
-          />
-          <button
-            type="button"
-            className={styles.showButton}
-            onClick={() => setShow((current) => !current)}
-          >
-            {show ? "ซ่อน" : "แสดง"}
-          </button>
-        </div>
-        <p id="trip-password-error" className={styles.errorMessage} aria-live="polite">
-          {error}
-        </p>
-
-        <button type="submit" className={styles.primaryButton}>
-          เข้าใช้งาน
-        </button>
-      </form>
-    </div>
-  );
-}
-
 function SectionHead({
   index,
   eyebrow,
@@ -391,16 +324,12 @@ function StopRow({ stop, index }: { stop: TimedStop; index: number }) {
 }
 
 export function Trip01Client({ fontClassName }: { fontClassName: string }) {
-  const [unlocked, setUnlocked] = useState(false);
-
   return (
     <main className={cx(styles.tripRoot, fontClassName)}>
-      {!unlocked ? <PasswordGate onUnlock={() => setUnlocked(true)} /> : null}
-
-      <div className={cx(styles.tripPage, !unlocked && styles.tripPageLocked)} aria-hidden={!unlocked}>
+      <div className={styles.tripPage}>
         <header className={styles.hero}>
           <div className={styles.heroTop}>
-            <span className={styles.kicker}>Trip 01 · Private roadbook</span>
+            <span className={styles.kicker}>Trip 01 · Roadbook</span>
             <span className={styles.heroId}>R15v3</span>
           </div>
 
