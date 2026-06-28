@@ -8,8 +8,7 @@ import { sanitizeCoords } from "@/lib/trip-gps/geo";
 import type { LocationPayload, TrackerMode, UploadReason } from "@/lib/trip-gps/types";
 import styles from "./live-tracker.module.css";
 
-const PHASE_2_UPLOAD_TOKEN = "phase-02-non-secret-placeholder";
-const SESSION_PREFIX = "trip01";
+const SESSION_ENDPOINT = "/api/trips/001/session";
 const TICK_MS = 1_000;
 const SECONDS_PER_MINUTE = 60;
 const COPY_RESET_MS = 1_800;
@@ -50,6 +49,28 @@ type PositionSnapshot = {
 
 type StatusTone = "neutral" | "good" | "warn" | "danger";
 
+type SessionSummary = {
+  id: string;
+  tripId: string;
+  active: boolean;
+  expiresAt: string;
+  stoppedAt: string | null;
+  revokedAt: string | null;
+};
+
+type CreateSessionResponse = {
+  ok: true;
+  session: SessionSummary;
+  ownerToken: string;
+  viewerToken: string;
+  viewerLink: string;
+};
+
+type StopSessionResponse = {
+  ok: true;
+  session: SessionSummary;
+};
+
 const modeLabels: Record<TrackerMode, string> = {
   active: `Active · ${formatCadence(intervalForMode("active"))}`,
   saver: `Battery saver · ${formatCadence(intervalForMode("saver"))}`,
@@ -84,16 +105,6 @@ const wakeLockLabels: Record<WakeLockStatus, string> = {
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
-}
-
-function createSessionId() {
-  const stamp = new Date().toISOString().replace(/[-:.TZ]/g, "").slice(0, 14);
-  const suffix =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
-
-  return `${SESSION_PREFIX}_${stamp}_${suffix}`;
 }
 
 function readCurrentPosition(): Promise<GeolocationPosition> {
@@ -201,6 +212,105 @@ function buildViewerLink(origin: string) {
   return `${origin}/trip/001/live`;
 }
 
+async function createLiveSession(code: string): Promise<CreateSessionResponse> {
+  const response = await fetch(SESSION_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ code }),
+  });
+  const body = await readJson(response);
+
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(body, response.status, "Could not create a GPS session."));
+  }
+
+  if (!isCreateSessionResponse(body)) {
+    throw new Error("GPS session response was invalid.");
+  }
+
+  return body;
+}
+
+async function stopLiveSession(
+  ownerToken: string,
+  sessionId: string,
+  action: "stop" | "revoke"
+): Promise<StopSessionResponse> {
+  const response = await fetch(SESSION_ENDPOINT, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${ownerToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify({ sessionId, action }),
+  });
+  const body = await readJson(response);
+
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(body, response.status, "Could not stop the GPS session."));
+  }
+
+  if (!isStopSessionResponse(body)) {
+    throw new Error("GPS stop response was invalid.");
+  }
+
+  return body;
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function apiErrorMessage(body: unknown, status: number, fallback: string): string {
+  if (isRecord(body) && typeof body.message === "string" && body.message.trim()) {
+    return `${body.message} Status ${status}.`;
+  }
+
+  return `${fallback} Status ${status}.`;
+}
+
+function isCreateSessionResponse(value: unknown): value is CreateSessionResponse {
+  return (
+    isRecord(value) &&
+    value.ok === true &&
+    isSessionSummary(value.session) &&
+    typeof value.ownerToken === "string" &&
+    value.ownerToken.length > 0 &&
+    typeof value.viewerToken === "string" &&
+    value.viewerToken.length > 0 &&
+    typeof value.viewerLink === "string" &&
+    value.viewerLink.length > 0
+  );
+}
+
+function isStopSessionResponse(value: unknown): value is StopSessionResponse {
+  return isRecord(value) && value.ok === true && isSessionSummary(value.session);
+}
+
+function isSessionSummary(value: unknown): value is SessionSummary {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.tripId === "string" &&
+    typeof value.active === "boolean" &&
+    typeof value.expiresAt === "string" &&
+    (typeof value.stoppedAt === "string" || value.stoppedAt === null) &&
+    (typeof value.revokedAt === "string" || value.revokedAt === null)
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function statusTone(status: UploadStatus): StatusTone {
   switch (status) {
     case "sent":
@@ -221,6 +331,8 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   const [mode, setMode] = useState<TrackerMode>("active");
   const [isSharing, setIsSharing] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const [ownerCode, setOwnerCode] = useState("");
   const [permission, setPermission] = useState<PermissionStatus>("not-requested");
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
   const [wakeLockStatus, setWakeLockStatus] = useState<WakeLockStatus>("off");
@@ -228,6 +340,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   const [lastSentAt, setLastSentAt] = useState<string | null>(null);
   const [lastAccuracy, setLastAccuracy] = useState<number | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
   const [viewerLink, setViewerLink] = useState("/trip/001/live");
   const [copied, setCopied] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
@@ -235,6 +348,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   const [now, setNow] = useState(0);
 
   const sessionIdRef = useRef<string | null>(null);
+  const ownerTokenRef = useRef<string | null>(null);
   const seqRef = useRef(0);
   const modeRef = useRef<TrackerMode>(mode);
   const sharingRef = useRef(isSharing);
@@ -359,6 +473,14 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         return false;
       }
 
+      const ownerToken = ownerTokenRef.current;
+
+      if (!ownerToken) {
+        setUploadStatus("error");
+        setLastError("No GPS owner token is active yet.");
+        return false;
+      }
+
       const payload: LocationPayload = {
         sessionId,
         seq: ++seqRef.current,
@@ -378,7 +500,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
       try {
         const result = await uploadLocation(payload, {
-          token: PHASE_2_UPLOAD_TOKEN,
+          token: ownerToken,
         });
 
         if (result.ok) {
@@ -389,7 +511,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
         setUploadStatus(result.queued ? "queued" : "rejected");
         setLastError(
-          `${result.message}${result.status ? ` Status ${result.status}.` : ""} Phase 4/7 will connect the real endpoint and owner token.`
+          `${result.message}${result.status ? ` Status ${result.status}.` : ""}`
         );
 
         return true;
@@ -462,28 +584,54 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       return;
     }
 
+    const code = ownerCode.trim();
+
+    if (!code) {
+      setLastError("Enter the live-share code before starting.");
+      return;
+    }
+
     setIsStarting(true);
     setLastError(null);
     setNextSendAt(null);
     setUploadStatus("idle");
 
-    const sessionId = createSessionId();
-    sessionIdRef.current = sessionId;
-    seqRef.current = 0;
+    try {
+      const session = await createLiveSession(code);
 
-    const captured = await captureAndUpload("start", sessionId, modeRef.current);
+      ownerTokenRef.current = session.ownerToken;
+      sessionIdRef.current = session.session.id;
+      seqRef.current = 0;
+      setViewerLink(session.viewerLink);
+      setSessionExpiresAt(session.session.expiresAt);
+      setOwnerCode("");
 
-    setIsStarting(false);
+      const captured = await captureAndUpload("start", session.session.id, modeRef.current);
 
-    if (!captured) {
-      return;
+      if (!captured) {
+        await stopLiveSession(session.ownerToken, session.session.id, "revoke").catch(() => undefined);
+        ownerTokenRef.current = null;
+        sessionIdRef.current = null;
+        setSessionExpiresAt(null);
+        setViewerLink(
+          typeof window === "undefined" ? "/trip/001/live" : buildViewerLink(window.location.origin)
+        );
+        return;
+      }
+
+      setIsSharing(true);
+      setNow(Date.now());
+      setNextSendAt(Date.now() + intervalForMode(modeRef.current));
+      void requestWakeLock();
+    } catch (error) {
+      ownerTokenRef.current = null;
+      sessionIdRef.current = null;
+      setSessionExpiresAt(null);
+      setLastError(error instanceof Error ? error.message : "Could not start live GPS sharing.");
+    } finally {
+      setIsStarting(false);
     }
-
-    setIsSharing(true);
-    setNow(Date.now());
-    setNextSendAt(Date.now() + intervalForMode(modeRef.current));
-    void requestWakeLock();
-  }, [captureAndUpload, isSharing, isStarting, requestWakeLock]);
+  }, [captureAndUpload, isSharing, isStarting, ownerCode, requestWakeLock]);
 
   const handleManualPing = useCallback(
     async (reason: UploadReason = "manual") => {
@@ -502,11 +650,15 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   );
 
   const handleStop = useCallback(async () => {
-    if (!isSharing) {
+    if (!isSharing || isStopping) {
       return;
     }
 
+    const ownerToken = ownerTokenRef.current;
+    const sessionId = sessionIdRef.current;
+
     setIsSharing(false);
+    setIsStopping(true);
     setNextSendAt(null);
 
     if (watchIdRef.current !== null && "geolocation" in navigator) {
@@ -517,7 +669,8 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     await releaseWakeLock();
 
     const lastPosition = lastPositionRef.current;
-    if (lastPosition) {
+
+    if (lastPosition && ownerToken && sessionId) {
       await uploadSnapshot(
         {
           ...lastPosition,
@@ -527,9 +680,26 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       );
     } else {
       setUploadStatus("error");
-      setLastError("No last GPS point is available for the stop ping.");
+      setLastError("No active GPS session is available for the stop ping.");
     }
-  }, [isSharing, releaseWakeLock, uploadSnapshot]);
+
+    if (!ownerToken || !sessionId) {
+      setIsStopping(false);
+      return;
+    }
+
+    try {
+      await stopLiveSession(ownerToken, sessionId, "stop");
+      ownerTokenRef.current = null;
+      sessionIdRef.current = null;
+      setSessionExpiresAt(null);
+    } catch (error) {
+      setUploadStatus("error");
+      setLastError(error instanceof Error ? error.message : "Could not stop live GPS sharing.");
+    } finally {
+      setIsStopping(false);
+    }
+  }, [isSharing, isStopping, releaseWakeLock, uploadSnapshot]);
 
   const handleModeToggle = useCallback((nextMode: TrackerMode) => {
     const resolvedMode = modeRef.current === nextMode ? "active" : nextMode;
@@ -564,8 +734,11 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     void handleStart();
   }, [handleManualPing, handleStart, isSharing]);
 
-  const isBusy = isStarting || uploadStatus === "capturing" || uploadStatus === "uploading";
+  const isBusy =
+    isStarting || isStopping || uploadStatus === "capturing" || uploadStatus === "uploading";
   const nextSendLabel = isSharing && nextSendAt ? formatCountdown(nextSendAt - now) : "Paused";
+  const hasTokenedViewerLink = viewerLink.includes("?t=");
+  const canStart = ownerCode.trim().length > 0;
   const wakeLockTone: StatusTone =
     wakeLockStatus === "active" ? "good" : wakeLockStatus === "error" ? "danger" : "warn";
   const permissionTone: StatusTone =
@@ -587,6 +760,11 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         tone: lastAccuracy === null ? "neutral" : "good",
       },
       { label: "Upload", value: uploadLabels[uploadStatus], tone: statusTone(uploadStatus) },
+      {
+        label: "Expires",
+        value: sessionExpiresAt ? formatClock(sessionExpiresAt) : "No session",
+        tone: sessionExpiresAt ? "warn" : "neutral",
+      },
       { label: "Wake lock", value: wakeLockLabels[wakeLockStatus], tone: wakeLockTone },
     ],
     [
@@ -597,6 +775,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       nextSendLabel,
       permission,
       permissionTone,
+      sessionExpiresAt,
       uploadStatus,
       wakeLockStatus,
       wakeLockTone,
@@ -633,12 +812,28 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         </ul>
       </div>
 
+      <label className={styles.codeBox} htmlFor="trip-gps-owner-code">
+        <span className={styles.viewerLabel}>Live-share code</span>
+        <input
+          id="trip-gps-owner-code"
+          name="trip-gps-owner-code"
+          type="password"
+          value={ownerCode}
+          autoComplete="off"
+          inputMode="text"
+          placeholder="Server owner code"
+          disabled={isSharing || isBusy}
+          onChange={(event) => setOwnerCode(event.target.value)}
+        />
+        <span>Required before Start because this trip page is public.</span>
+      </label>
+
       <div className={styles.controls} aria-label="Live location controls">
         <button
           className={styles.primaryAction}
           type="button"
           onClick={() => void handleStart()}
-          disabled={isSharing || isBusy || permission === "unsupported"}
+          disabled={isSharing || isBusy || permission === "unsupported" || !canStart}
         >
           {isStarting ? "Starting..." : "Start sharing"}
         </button>
@@ -646,9 +841,9 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           className={styles.stopAction}
           type="button"
           onClick={() => void handleStop()}
-          disabled={!isSharing}
+          disabled={!isSharing || isStopping}
         >
-          Stop sharing
+          {isStopping ? "Stopping..." : "Stop sharing"}
         </button>
         <button
           className={styles.secondaryAction}
@@ -689,9 +884,14 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         <div>
           <span className={styles.viewerLabel}>Viewer link</span>
           <code>{viewerLink}</code>
-          <p>Tokened viewer access is connected in later phases; this keeps the copy surface ready.</p>
+          <p>{hasTokenedViewerLink ? "Share this tokened link with viewers." : "Start a session to mint a viewer token."}</p>
         </div>
-        <button className={styles.copyButton} type="button" onClick={() => void handleCopyViewerLink()}>
+        <button
+          className={styles.copyButton}
+          type="button"
+          onClick={() => void handleCopyViewerLink()}
+          disabled={!hasTokenedViewerLink}
+        >
           {copied ? "Copied" : "Copy"}
         </button>
       </div>

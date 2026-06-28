@@ -42,6 +42,7 @@ export type ShareSession = {
   active: boolean;
   expires_at: string;
   revoked_at: string | null;
+  stopped_at: string | null;
   owner_token_hash: string;
   viewer_token_hash: string;
 };

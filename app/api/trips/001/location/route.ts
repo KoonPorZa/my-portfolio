@@ -109,7 +109,7 @@ export async function GET(request: Request) {
     return errorResponse(403, "forbidden", "Session is inactive, expired, or revoked.");
   }
 
-  if (!session.active) {
+  if (!session.active || session.stopped_at) {
     return viewerResponse("stopped", null, null, "Live sharing has stopped.");
   }
 
@@ -267,7 +267,7 @@ function isTooFrequent(latest: LocationLatest | null, now: number): boolean {
 }
 
 function canWriteSession(session: ShareSession): boolean {
-  return session.active && !session.revoked_at && !isExpired(session);
+  return session.active && !session.revoked_at && !session.stopped_at && !isExpired(session);
 }
 
 function isExpired(session: ShareSession): boolean {

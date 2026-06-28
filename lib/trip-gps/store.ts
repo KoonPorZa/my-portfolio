@@ -1,51 +1,56 @@
 import "server-only";
 
 import type { LocationLatest, LocationPayload, ShareSession } from "./types";
-
-export const DEV_OWNER_TOKEN = "phase-02-non-secret-placeholder";
-export const DEV_VIEWER_TOKEN = "phase-04-dev-viewer-token";
-
-const DEV_SESSION_ID = "trip01_dev_session";
-const DEV_TRIP_ID = "001";
-const DEV_EXPIRES_AT = "2099-01-01T00:00:00.000Z";
+import { verifyToken } from "./token";
 
 export type LocationStorePoint = LocationPayload & {
   serverTs: string;
 };
 
+export type SessionEndAction = "stop" | "revoke";
+
 export interface LocationStore {
+  createShareSession(session: ShareSession): Promise<ShareSession>;
   findOwnerSessionByToken(token: string, sessionId: string): Promise<ShareSession | null>;
   findViewerSessionByToken(token: string): Promise<ShareSession | null>;
   getLatestLocation(sessionId: string): Promise<LocationLatest | null>;
   recordLocation(point: LocationStorePoint): Promise<LocationLatest>;
+  stopSessionById(sessionId: string, action: SessionEndAction): Promise<ShareSession | null>;
+  stopSessionByOwnerToken(
+    token: string,
+    sessionId: string | null,
+    action: SessionEndAction
+  ): Promise<ShareSession | null>;
+  stopActiveSessions(action: SessionEndAction): Promise<ShareSession[]>;
 }
 
 class InMemoryLocationStore implements LocationStore {
   private readonly sessions = new Map<string, ShareSession>();
   private readonly latest = new Map<string, LocationLatest>();
   private readonly history = new Map<string, LocationStorePoint[]>();
-  private currentDevSessionId = DEV_SESSION_ID;
+  private currentSessionId: string | null = null;
 
-  constructor() {
-    if (isDevStoreEnabled()) {
-      this.sessions.set(DEV_SESSION_ID, createDevSession(DEV_SESSION_ID));
-    }
+  async createShareSession(session: ShareSession): Promise<ShareSession> {
+    const stored = { ...session };
+
+    this.sessions.set(stored.id, stored);
+    this.currentSessionId = stored.id;
+
+    return stored;
   }
 
   async findOwnerSessionByToken(token: string, sessionId: string): Promise<ShareSession | null> {
-    if (!isDevStoreEnabled() || token !== DEV_OWNER_TOKEN) {
+    const session = this.sessions.get(sessionId);
+
+    if (!session || !verifyToken(token, session.owner_token_hash)) {
       return null;
     }
 
-    return this.ensureDevSession(sessionId);
+    return session;
   }
 
   async findViewerSessionByToken(token: string): Promise<ShareSession | null> {
-    if (!isDevStoreEnabled() || token !== DEV_VIEWER_TOKEN) {
-      return null;
-    }
-
-    return this.ensureDevSession(this.currentDevSessionId);
+    return this.findSessionByTokenHash(token, "viewer_token_hash");
   }
 
   async getLatestLocation(sessionId: string): Promise<LocationLatest | null> {
@@ -74,37 +79,70 @@ class InMemoryLocationStore implements LocationStore {
     return latest;
   }
 
-  private ensureDevSession(sessionId: string): ShareSession {
-    const existing = this.sessions.get(sessionId);
+  async stopSessionById(sessionId: string, action: SessionEndAction): Promise<ShareSession | null> {
+    const session = this.sessions.get(sessionId);
 
-    if (existing) {
-      this.currentDevSessionId = sessionId;
-      return existing;
+    return session ? this.endSession(session, action) : null;
+  }
+
+  async stopSessionByOwnerToken(
+    token: string,
+    sessionId: string | null,
+    action: SessionEndAction
+  ): Promise<ShareSession | null> {
+    const session = sessionId
+      ? await this.findOwnerSessionByToken(token, sessionId)
+      : this.findSessionByTokenHash(token, "owner_token_hash");
+
+    return session ? this.endSession(session, action) : null;
+  }
+
+  async stopActiveSessions(action: SessionEndAction): Promise<ShareSession[]> {
+    const stopped: ShareSession[] = [];
+
+    for (const session of this.sessions.values()) {
+      if (session.active) {
+        stopped.push(this.endSession(session, action));
+      }
     }
 
-    const session = createDevSession(sessionId);
-
-    this.sessions.set(sessionId, session);
-    this.currentDevSessionId = sessionId;
-
-    return session;
+    return stopped;
   }
-}
 
-function createDevSession(id: string): ShareSession {
-  return {
-    id,
-    trip_id: DEV_TRIP_ID,
-    active: true,
-    expires_at: DEV_EXPIRES_AT,
-    revoked_at: null,
-    owner_token_hash: "mock-owner-token",
-    viewer_token_hash: "mock-viewer-token",
-  };
-}
+  private findSessionByTokenHash(
+    token: string,
+    hashField: "owner_token_hash" | "viewer_token_hash"
+  ): ShareSession | null {
+    const sessions = Array.from(this.sessions.values()).reverse();
 
-function isDevStoreEnabled(): boolean {
-  return process.env.NODE_ENV !== "production";
+    for (const session of sessions) {
+      if (verifyToken(token, session[hashField])) {
+        return session;
+      }
+    }
+
+    return null;
+  }
+
+  private endSession(session: ShareSession, action: SessionEndAction): ShareSession {
+    const now = new Date().toISOString();
+    const stoppedAt = action === "stop" ? (session.stopped_at ?? now) : session.stopped_at;
+    const revokedAt = action === "revoke" ? (session.revoked_at ?? now) : session.revoked_at;
+    const updated: ShareSession = {
+      ...session,
+      active: false,
+      stopped_at: stoppedAt,
+      revoked_at: revokedAt,
+    };
+
+    this.sessions.set(updated.id, updated);
+
+    if (this.currentSessionId === updated.id) {
+      this.currentSessionId = null;
+    }
+
+    return updated;
+  }
 }
 
 declare global {
