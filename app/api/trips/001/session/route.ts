@@ -64,6 +64,9 @@ export async function POST(request: Request) {
     expires_at: expiresAt,
     revoked_at: null,
     stopped_at: null,
+    last_viewer_access_at: null,
+    upload_count: 0,
+    last_error: null,
     owner_token_hash: hashToken(ownerToken),
     viewer_token_hash: hashToken(viewerToken),
   };

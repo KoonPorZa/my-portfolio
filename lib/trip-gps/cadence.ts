@@ -4,6 +4,7 @@ const SECOND_MS = 1_000;
 const MINUTE_MS = 60 * SECOND_MS;
 
 export const ACTIVE_INTERVAL_MS = 5 * MINUTE_MS;
+export const CITY_APPROACH_INTERVAL_MS = 2 * MINUTE_MS;
 export const SAVER_INTERVAL_MS = 10 * MINUTE_MS;
 export const REST_INTERVAL_MS = 15 * MINUTE_MS;
 export const STALE_AFTER_MS = 15 * MINUTE_MS;
@@ -15,6 +16,7 @@ export const WAITING_POLL_MS = 30 * SECOND_MS;
 
 export const TRACKER_INTERVAL_MS: Readonly<Record<TrackerMode, number>> = {
   active: ACTIVE_INTERVAL_MS,
+  city: CITY_APPROACH_INTERVAL_MS,
   saver: SAVER_INTERVAL_MS,
   rest: REST_INTERVAL_MS,
 };

@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { LocationLatest, LocationPayload, ShareSession } from "./types";
+import type {
+  LocationLatest,
+  LocationPayload,
+  SessionAudit,
+  ShareSession,
+} from "./types";
 import {
   getSupabaseServerClient,
   hasRealSupabaseConfig,
@@ -20,7 +25,10 @@ export interface LocationStore {
   findOwnerSessionByToken(token: string, sessionId: string): Promise<ShareSession | null>;
   findViewerSessionByToken(token: string): Promise<ShareSession | null>;
   getLatestLocation(sessionId: string): Promise<LocationLatest | null>;
+  recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null>;
   recordLocation(point: LocationStorePoint): Promise<LocationLatest>;
+  recordUploadSuccess(sessionId: string): Promise<SessionAudit | null>;
+  recordViewerAccess(sessionId: string, accessedAt: string): Promise<SessionAudit | null>;
   stopSessionById(sessionId: string, action: SessionEndAction): Promise<ShareSession | null>;
   stopSessionByOwnerToken(
     token: string,
@@ -70,6 +78,23 @@ class InMemoryLocationStore implements LocationStore {
     return this.latest.get(sessionId) ?? null;
   }
 
+  async recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null> {
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      return null;
+    }
+
+    const updated: ShareSession = {
+      ...session,
+      last_error: message,
+    };
+
+    this.sessions.set(sessionId, updated);
+
+    return toSessionAudit(updated);
+  }
+
   async recordLocation(point: LocationStorePoint): Promise<LocationLatest> {
     const latest: LocationLatest = {
       lat: point.lat,
@@ -86,10 +111,52 @@ class InMemoryLocationStore implements LocationStore {
     this.latest.set(point.sessionId, latest);
 
     const history = this.history.get(point.sessionId) ?? [];
-    history.push(point);
+    const existingIndex = history.findIndex((storedPoint) => storedPoint.seq === point.seq);
+
+    if (existingIndex >= 0) {
+      history[existingIndex] = point;
+    } else {
+      history.push(point);
+    }
+
     this.history.set(point.sessionId, history);
 
     return latest;
+  }
+
+  async recordUploadSuccess(sessionId: string): Promise<SessionAudit | null> {
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      return null;
+    }
+
+    const updated: ShareSession = {
+      ...session,
+      upload_count: session.upload_count + 1,
+      last_error: null,
+    };
+
+    this.sessions.set(sessionId, updated);
+
+    return toSessionAudit(updated);
+  }
+
+  async recordViewerAccess(sessionId: string, accessedAt: string): Promise<SessionAudit | null> {
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      return null;
+    }
+
+    const updated: ShareSession = {
+      ...session,
+      last_viewer_access_at: accessedAt,
+    };
+
+    this.sessions.set(sessionId, updated);
+
+    return toSessionAudit(updated);
   }
 
   async stopSessionById(sessionId: string, action: SessionEndAction): Promise<ShareSession | null> {
@@ -213,6 +280,12 @@ export class SupabaseLocationStore implements LocationStore {
     return data ? toLocationLatest(data) : null;
   }
 
+  async recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null> {
+    return this.updateSessionAudit(sessionId, {
+      last_error: message,
+    });
+  }
+
   async recordLocation(point: LocationStorePoint): Promise<LocationLatest> {
     const latestRow = toLatestRow(point);
     const pointRow: PointInsert = {
@@ -239,6 +312,25 @@ export class SupabaseLocationStore implements LocationStore {
     }
 
     return toLocationLatest(data);
+  }
+
+  async recordUploadSuccess(sessionId: string): Promise<SessionAudit | null> {
+    const session = await this.findSessionById(sessionId);
+
+    if (!session) {
+      return null;
+    }
+
+    return this.updateSessionAudit(sessionId, {
+      upload_count: session.upload_count + 1,
+      last_error: null,
+    });
+  }
+
+  async recordViewerAccess(sessionId: string, accessedAt: string): Promise<SessionAudit | null> {
+    return this.updateSessionAudit(sessionId, {
+      last_viewer_access_at: accessedAt,
+    });
   }
 
   async stopSessionById(sessionId: string, action: SessionEndAction): Promise<ShareSession | null> {
@@ -304,6 +396,24 @@ export class SupabaseLocationStore implements LocationStore {
     }
 
     return data ? toShareSession(data) : null;
+  }
+
+  private async updateSessionAudit(
+    sessionId: string,
+    update: SessionUpdate
+  ): Promise<SessionAudit | null> {
+    const { data, error } = await this.supabase
+      .from("trip_share_sessions")
+      .update(update)
+      .eq("id", sessionId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      throwSupabaseError("update session audit", error);
+    }
+
+    return data ? toSessionAudit(toShareSession(data)) : null;
   }
 
   private async findSessionByTokenHash(
@@ -435,8 +545,19 @@ function toShareSession(row: SessionRow): ShareSession {
     expires_at: row.expires_at,
     revoked_at: row.revoked_at,
     stopped_at: row.stopped_at,
+    last_viewer_access_at: row.last_viewer_access_at,
+    upload_count: row.upload_count,
+    last_error: row.last_error,
     owner_token_hash: row.owner_token_hash,
     viewer_token_hash: row.viewer_token_hash,
+  };
+}
+
+function toSessionAudit(session: ShareSession): SessionAudit {
+  return {
+    lastViewerAccessAt: session.last_viewer_access_at,
+    uploadCount: session.upload_count,
+    lastError: session.last_error,
   };
 }
 

@@ -147,6 +147,13 @@
   margin-top: 16px;
 }
 
+.modeShortcuts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 9px;
+}
+
 .primaryAction,
 .stopAction,
 .secondaryAction,
@@ -347,11 +354,11 @@
   }
 
   .controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .primaryAction {
-    grid-column: span 2;
+  .modeShortcuts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .statusGrid {
@@ -366,11 +373,7 @@
 
 @media (min-width: 700px) {
   .controls {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .primaryAction {
-    grid-column: span 1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

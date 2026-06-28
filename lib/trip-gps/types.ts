@@ -1,4 +1,6 @@
-export type TrackerMode = "active" | "saver" | "rest";
+export const TRACKER_MODES = ["active", "saver", "rest", "city"] as const;
+
+export type TrackerMode = (typeof TRACKER_MODES)[number];
 
 export type UploadReason = "scheduled" | "manual" | "start" | "stop" | "retry";
 
@@ -43,6 +45,15 @@ export type ShareSession = {
   expires_at: string;
   revoked_at: string | null;
   stopped_at: string | null;
+  last_viewer_access_at: string | null;
+  upload_count: number;
+  last_error: string | null;
   owner_token_hash: string;
   viewer_token_hash: string;
+};
+
+export type SessionAudit = {
+  lastViewerAccessAt: string | null;
+  uploadCount: number;
+  lastError: string | null;
 };

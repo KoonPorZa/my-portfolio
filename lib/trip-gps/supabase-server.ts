@@ -11,6 +11,9 @@ type TripShareSessionRow = {
   expires_at: string;
   revoked_at: string | null;
   stopped_at: string | null;
+  last_viewer_access_at: string | null;
+  upload_count: number;
+  last_error: string | null;
   owner_token_hash: string;
   viewer_token_hash: string;
 };

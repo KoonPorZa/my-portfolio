@@ -13,9 +13,17 @@ create table if not exists public.trip_share_sessions (
   expires_at timestamptz not null,
   revoked_at timestamptz,
   stopped_at timestamptz,
+  last_viewer_access_at timestamptz,
+  upload_count integer not null default 0 check (upload_count >= 0),
+  last_error text,
   owner_token_hash text not null check (owner_token_hash ~ '^[0-9a-f]{64}$'),
   viewer_token_hash text not null check (viewer_token_hash ~ '^[0-9a-f]{64}$')
 );
+
+alter table public.trip_share_sessions
+  add column if not exists last_viewer_access_at timestamptz,
+  add column if not exists upload_count integer not null default 0 check (upload_count >= 0),
+  add column if not exists last_error text;
 
 create unique index if not exists trip_share_sessions_owner_token_hash_idx
   on public.trip_share_sessions (owner_token_hash);
@@ -34,11 +42,16 @@ create table if not exists public.trip_location_latest (
   accuracy_m double precision not null check (accuracy_m >= 0),
   speed_mps double precision,
   heading_deg double precision check (heading_deg is null or heading_deg between 0 and 360),
-  mode text not null check (mode in ('active', 'saver', 'rest')),
+  mode text not null check (mode in ('active', 'saver', 'rest', 'city')),
   reason text not null check (reason in ('scheduled', 'manual', 'start', 'stop', 'retry')),
   client_ts timestamptz not null,
   server_ts timestamptz not null default now()
 );
+
+alter table public.trip_location_latest
+  drop constraint if exists trip_location_latest_mode_check,
+  add constraint trip_location_latest_mode_check
+    check (mode in ('active', 'saver', 'rest', 'city'));
 
 create index if not exists trip_location_latest_server_ts_idx
   on public.trip_location_latest (server_ts);
@@ -52,12 +65,17 @@ create table if not exists public.trip_location_points (
   accuracy_m double precision not null check (accuracy_m >= 0),
   speed_mps double precision,
   heading_deg double precision check (heading_deg is null or heading_deg between 0 and 360),
-  mode text not null check (mode in ('active', 'saver', 'rest')),
+  mode text not null check (mode in ('active', 'saver', 'rest', 'city')),
   reason text not null check (reason in ('scheduled', 'manual', 'start', 'stop', 'retry')),
   client_ts timestamptz not null,
   server_ts timestamptz not null default now(),
   primary key (session_id, seq)
 );
+
+alter table public.trip_location_points
+  drop constraint if exists trip_location_points_mode_check,
+  add constraint trip_location_points_mode_check
+    check (mode in ('active', 'saver', 'rest', 'city'));
 
 create index if not exists trip_location_points_server_ts_idx
   on public.trip_location_points (server_ts);

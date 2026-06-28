@@ -5,14 +5,16 @@ import {
 } from "@/lib/trip-gps/cadence";
 import { isAcceptableAccuracy, sanitizeCoords } from "@/lib/trip-gps/geo";
 import { getLocationStore } from "@/lib/trip-gps/store";
-import type {
-  LocationFreshness,
-  LocationLatest,
-  LocationPayload,
-  ShareSession,
-  TrackerMode,
-  UploadReason,
-  ViewerState,
+import {
+  TRACKER_MODES,
+  type LocationFreshness,
+  type LocationLatest,
+  type LocationPayload,
+  type SessionAudit,
+  type ShareSession,
+  type TrackerMode,
+  type UploadReason,
+  type ViewerState,
 } from "@/lib/trip-gps/types";
 
 export const runtime = "nodejs";
@@ -28,8 +30,15 @@ type ViewerLatestResponse = {
   freshness: LocationFreshness | null;
   viewerState: ViewerState;
   latest: LocationLatest | null;
+  audit: SessionAudit | null;
   nextPollMs: number;
   message: string;
+};
+
+type UploadLocationResponse = {
+  ok: true;
+  latest: LocationLatest;
+  audit: SessionAudit | null;
 };
 
 type PayloadParseResult =
@@ -41,7 +50,7 @@ type PayloadParseResult =
       ok: false;
     };
 
-const trackerModes = new Set<TrackerMode>(["active", "saver", "rest"]);
+const trackerModes = new Set<TrackerMode>(TRACKER_MODES);
 const uploadReasons = new Set<UploadReason>(["scheduled", "manual", "start", "stop", "retry"]);
 
 export async function POST(request: Request) {
@@ -65,27 +74,39 @@ export async function POST(request: Request) {
   }
 
   if (!canWriteSession(session)) {
+    await store.recordSessionError(session.id, "Session is inactive, expired, or revoked.");
     return errorResponse(403, "forbidden", "Session is inactive, expired, or revoked.");
   }
 
   const latest = await store.getLatestLocation(session.id);
   const now = Date.now();
 
-  if (parsed.payload.reason !== "manual" && isTooFrequent(latest, now)) {
+  if (shouldThrottleUpload(parsed.payload.reason) && isTooFrequent(latest, now)) {
+    await store.recordSessionError(session.id, "Location uploads are too frequent.");
     return errorResponse(429, "too_frequent", "Location uploads are too frequent.");
   }
 
   const serverTs = new Date(now).toISOString();
-  const storedLatest = await store.recordLocation({
-    ...parsed.payload,
-    sessionId: session.id,
-    serverTs,
-  });
+  let storedLatest: LocationLatest;
 
-  return jsonResponse(
+  try {
+    storedLatest = await store.recordLocation({
+      ...parsed.payload,
+      sessionId: session.id,
+      serverTs,
+    });
+  } catch (error) {
+    await store.recordSessionError(session.id, errorMessage(error));
+    throw error;
+  }
+
+  const audit = await store.recordUploadSuccess(session.id);
+
+  return jsonResponse<UploadLocationResponse>(
     {
       ok: true,
       latest: storedLatest,
+      audit,
     },
     200
   );
@@ -109,19 +130,21 @@ export async function GET(request: Request) {
     return errorResponse(403, "forbidden", "Session is inactive, expired, or revoked.");
   }
 
+  const audit = await store.recordViewerAccess(session.id, new Date().toISOString());
+
   if (!session.active || session.stopped_at) {
-    return viewerResponse("stopped", null, null, "Live sharing has stopped.");
+    return viewerResponse("stopped", null, null, "Live sharing has stopped.", audit);
   }
 
   const latest = await store.getLatestLocation(session.id);
 
   if (!latest) {
-    return viewerResponse("active", null, null, "Waiting for the first GPS point.");
+    return viewerResponse("active", null, null, "Waiting for the first GPS point.", audit);
   }
 
   const freshness = freshnessFor(Date.now() - Date.parse(latest.serverTs));
 
-  return viewerResponse("active", freshness, latest, messageForFreshness(freshness));
+  return viewerResponse("active", freshness, latest, messageForFreshness(freshness), audit);
 }
 
 async function readLocationPayload(request: Request): Promise<PayloadParseResult> {
@@ -198,7 +221,8 @@ function viewerResponse(
   status: ViewerLatestResponse["status"],
   freshness: LocationFreshness | null,
   latest: LocationLatest | null,
-  message: string
+  message: string,
+  audit: SessionAudit | null
 ) {
   const viewerState = viewerStateFor(status, freshness, latest);
 
@@ -208,6 +232,7 @@ function viewerResponse(
       freshness,
       viewerState,
       latest,
+      audit,
       nextPollMs: nextPollMs(viewerState),
       message,
     },
@@ -264,6 +289,10 @@ function isTooFrequent(latest: LocationLatest | null, now: number): boolean {
   const lastServerTs = Date.parse(latest.serverTs);
 
   return Number.isFinite(lastServerTs) && now - lastServerTs < MIN_UPLOAD_INTERVAL_MS;
+}
+
+function shouldThrottleUpload(reason: UploadReason): boolean {
+  return reason === "scheduled";
 }
 
 function canWriteSession(session: ShareSession): boolean {
@@ -329,4 +358,8 @@ function isTrackerMode(value: unknown): value is TrackerMode {
 
 function isUploadReason(value: unknown): value is UploadReason {
   return typeof value === "string" && uploadReasons.has(value as UploadReason);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Location upload failed.";
 }

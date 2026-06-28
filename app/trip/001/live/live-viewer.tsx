@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { LocationFreshness, LocationLatest, TrackerMode, UploadReason, ViewerState } from "@/lib/trip-gps/types";
+import {
+  TRACKER_MODES,
+  type LocationFreshness,
+  type LocationLatest,
+  type TrackerMode,
+  type UploadReason,
+  type ViewerState,
+} from "@/lib/trip-gps/types";
 import styles from "./live.module.css";
 
 type ViewerLatestResponse = {
@@ -53,7 +60,7 @@ const viewerStates = new Set<ViewerState>([
 ]);
 
 const freshnessValues = new Set<LocationFreshness>(["fresh", "stale", "offline"]);
-const trackerModes = new Set<TrackerMode>(["active", "saver", "rest"]);
+const trackerModes = new Set<TrackerMode>(TRACKER_MODES);
 const uploadReasons = new Set<UploadReason>(["scheduled", "manual", "start", "stop", "retry"]);
 
 const stateCopy: Record<ViewerState, StateCopy> = {

@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { intervalForMode } from "@/lib/trip-gps/cadence";
+import { MAX_BAD_ACCURACY_M, intervalForMode } from "@/lib/trip-gps/cadence";
 import { uploadLocation } from "@/lib/trip-gps/client";
 import { sanitizeCoords } from "@/lib/trip-gps/geo";
-import type { LocationPayload, TrackerMode, UploadReason } from "@/lib/trip-gps/types";
+import {
+  TRACKER_MODES,
+  type LocationPayload,
+  type TrackerMode,
+  type UploadReason,
+} from "@/lib/trip-gps/types";
 import styles from "./live-tracker.module.css";
 
 const SESSION_ENDPOINT = "/api/trips/001/session";
@@ -15,6 +20,7 @@ const COPY_RESET_MS = 1_800;
 const GEO_PERMISSION_DENIED = 1;
 const GEO_POSITION_UNAVAILABLE = 2;
 const GEO_TIMEOUT = 3;
+const REPEATED_UPLOAD_FAILURE_COUNT = 2;
 
 type PermissionStatus = "not-requested" | "granted" | "denied" | "unsupported";
 type UploadStatus =
@@ -73,9 +79,20 @@ type StopSessionResponse = {
 
 const modeLabels: Record<TrackerMode, string> = {
   active: `Active · ${formatCadence(intervalForMode("active"))}`,
+  city: `City approach · ${formatCadence(intervalForMode("city"))}`,
   saver: `Battery saver · ${formatCadence(intervalForMode("saver"))}`,
   rest: `Rest · ${formatCadence(intervalForMode("rest"))}`,
 };
+
+const modeShortcuts: Array<{ mode: TrackerMode; label: string }> = TRACKER_MODES.map(
+  (trackerMode) => ({
+    mode: trackerMode,
+    label:
+      trackerMode === "city"
+        ? "City approach"
+        : trackerMode.charAt(0).toUpperCase() + trackerMode.slice(1),
+  })
+);
 
 const permissionLabels: Record<PermissionStatus, string> = {
   "not-requested": "Not requested",
@@ -189,15 +206,15 @@ function isGeolocationPositionError(error: unknown): error is GeolocationPositio
 function geolocationErrorMessage(error: unknown) {
   if (isGeolocationPositionError(error)) {
     if (error.code === GEO_PERMISSION_DENIED) {
-      return "Location permission was denied. Open browser settings for this site, allow Location, then retry.";
+      return "ปิดสิทธิ์ตำแหน่งอยู่ เปิด Location ให้เว็บนี้ใน browser settings แล้วลองใหม่";
     }
 
     if (error.code === GEO_POSITION_UNAVAILABLE) {
-      return "GPS position is unavailable. Check Location Services and move somewhere with clearer signal.";
+      return "อ่านตำแหน่งไม่ได้ ตรวจ Location Services และขยับไปจุดที่สัญญาณชัดขึ้น";
     }
 
     if (error.code === GEO_TIMEOUT) {
-      return "GPS took too long to respond. Try again with the phone unlocked.";
+      return "GPS ตอบช้าเกินไป ลองใหม่ตอนปลดล็อกหน้าจออยู่";
     }
   }
 
@@ -344,7 +361,9 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   const [viewerLink, setViewerLink] = useState("/trip/001/live");
   const [copied, setCopied] = useState(false);
   const [isHidden, setIsHidden] = useState(false);
+  const [wasHiddenWhileSharing, setWasHiddenWhileSharing] = useState(false);
   const [secureContext, setSecureContext] = useState<boolean | null>(null);
+  const [consecutiveUploadFailures, setConsecutiveUploadFailures] = useState(0);
   const [now, setNow] = useState(0);
 
   const sessionIdRef = useRef<string | null>(null);
@@ -378,7 +397,13 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     });
 
     const handleVisibility = () => {
-      setIsHidden(document.hidden);
+      const hidden = document.hidden;
+
+      setIsHidden(hidden);
+
+      if (hidden && sharingRef.current) {
+        setWasHiddenWhileSharing(true);
+      }
     };
 
     document.addEventListener("visibilitychange", handleVisibility);
@@ -506,10 +531,12 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         if (result.ok) {
           setUploadStatus("sent");
           setLastError(null);
+          setConsecutiveUploadFailures(0);
           return true;
         }
 
         setUploadStatus(result.queued ? "queued" : "rejected");
+        setConsecutiveUploadFailures((current) => current + 1);
         setLastError(
           `${result.message}${result.status ? ` Status ${result.status}.` : ""}`
         );
@@ -517,6 +544,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         return true;
       } catch (error) {
         setUploadStatus("error");
+        setConsecutiveUploadFailures((current) => current + 1);
         setLastError(error instanceof Error ? error.message : "GPS upload failed.");
         return true;
       }
@@ -594,6 +622,8 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     setIsStarting(true);
     setLastError(null);
     setNextSendAt(null);
+    setConsecutiveUploadFailures(0);
+    setWasHiddenWhileSharing(false);
     setUploadStatus("idle");
 
     try {
@@ -701,15 +731,13 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     }
   }, [isSharing, isStopping, releaseWakeLock, uploadSnapshot]);
 
-  const handleModeToggle = useCallback((nextMode: TrackerMode) => {
-    const resolvedMode = modeRef.current === nextMode ? "active" : nextMode;
-
-    modeRef.current = resolvedMode;
-    setMode(resolvedMode);
+  const handleModeSelect = useCallback((nextMode: TrackerMode) => {
+    modeRef.current = nextMode;
+    setMode(nextMode);
 
     if (sharingRef.current) {
       setNow(Date.now());
-      setNextSendAt(Date.now() + intervalForMode(resolvedMode));
+      setNextSendAt(Date.now() + intervalForMode(nextMode));
     }
   }, []);
 
@@ -747,17 +775,26 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       : permission === "denied" || permission === "unsupported"
         ? "danger"
         : "neutral";
+  const hasPoorAccuracy = lastAccuracy !== null && lastAccuracy > MAX_BAD_ACCURACY_M;
+  const hasVisibilityRisk =
+    isSharing && (isHidden || wasHiddenWhileSharing || wakeLockStatus !== "active");
+  const hasRepeatedUploadFailures =
+    consecutiveUploadFailures >= REPEATED_UPLOAD_FAILURE_COUNT;
 
   const statusItems = useMemo(
     () => [
       { label: "Permission", value: permissionLabels[permission], tone: permissionTone },
-      { label: "Mode", value: modeLabels[mode], tone: mode === "active" ? "good" : "warn" },
+      {
+        label: "Mode",
+        value: modeLabels[mode],
+        tone: mode === "active" || mode === "city" ? "good" : "warn",
+      },
       { label: "Next send", value: nextSendLabel, tone: isSharing ? "good" : "neutral" },
       { label: "Last sent", value: formatClock(lastSentAt), tone: lastSentAt ? "good" : "neutral" },
       {
         label: "Accuracy",
         value: lastAccuracy === null ? "None" : `±${Math.round(lastAccuracy)}m`,
-        tone: lastAccuracy === null ? "neutral" : "good",
+        tone: lastAccuracy === null ? "neutral" : hasPoorAccuracy ? "warn" : "good",
       },
       { label: "Upload", value: uploadLabels[uploadStatus], tone: statusTone(uploadStatus) },
       {
@@ -775,6 +812,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       nextSendLabel,
       permission,
       permissionTone,
+      hasPoorAccuracy,
       sessionExpiresAt,
       uploadStatus,
       wakeLockStatus,
@@ -853,22 +891,20 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         >
           Manual ping
         </button>
-        <button
-          className={cx(styles.modeAction, mode === "saver" && styles.modeActionOn)}
-          type="button"
-          aria-pressed={mode === "saver"}
-          onClick={() => handleModeToggle("saver")}
-        >
-          Battery saver
-        </button>
-        <button
-          className={cx(styles.modeAction, mode === "rest" && styles.modeActionOn)}
-          type="button"
-          aria-pressed={mode === "rest"}
-          onClick={() => handleModeToggle("rest")}
-        >
-          Rest mode
-        </button>
+      </div>
+
+      <div className={styles.modeShortcuts} aria-label="GPS cadence shortcuts">
+        {modeShortcuts.map((shortcut) => (
+          <button
+            key={shortcut.mode}
+            className={cx(styles.modeAction, mode === shortcut.mode && styles.modeActionOn)}
+            type="button"
+            aria-pressed={mode === shortcut.mode}
+            onClick={() => handleModeSelect(shortcut.mode)}
+          >
+            {shortcut.label}
+          </button>
+        ))}
       </div>
 
       <dl className={styles.statusGrid}>
@@ -898,8 +934,8 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
       {permission === "denied" ? (
         <div className={styles.warning} role="alert">
-          <strong>Location permission is denied.</strong>
-          <p>Open this site in browser settings, allow Location, return here, then retry.</p>
+          <strong>ปิดสิทธิ์ตำแหน่งอยู่</strong>
+          <p>เปิด Location ให้เว็บนี้ใน browser settings แล้วกด Retry ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
           <button className={styles.retryButton} type="button" onClick={handleRetry}>
             Retry permission
           </button>
@@ -908,15 +944,29 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
       {permission === "unsupported" ? (
         <div className={styles.warning} role="alert">
-          <strong>This browser does not expose GPS.</strong>
-          <p>Use a mobile browser that supports navigator.geolocation.</p>
+          <strong>เบราว์เซอร์นี้ไม่รองรับ GPS</strong>
+          <p>ใช้ mobile browser ที่รองรับ navigator.geolocation ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
         </div>
       ) : null}
 
-      {isHidden || (isSharing && wakeLockStatus !== "active") ? (
-        <div className={styles.warning}>
-          <strong>Keep the phone awake when possible.</strong>
-          <p>Hidden tabs, locked screens, and missing wake-lock support can pause scheduled GPS sends.</p>
+      {hasVisibilityRisk ? (
+        <div className={styles.warning} role="status">
+          <strong>ระวังหน้าจอล็อกหรือแท็บถูกซ่อน</strong>
+          <p>ถ้าหน้าจอดับหรือสลับแอป รอบส่ง GPS อาจหยุดชั่วคราว ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+        </div>
+      ) : null}
+
+      {hasPoorAccuracy ? (
+        <div className={styles.warning} role="status">
+          <strong>ตำแหน่งคร่าว ๆ</strong>
+          <p>ความแม่นยำล่าสุดกว้างกว่า ±{MAX_BAD_ACCURACY_M} ม. ใช้เป็นจุดประมาณเท่านั้น ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+        </div>
+      ) : null}
+
+      {hasRepeatedUploadFailures ? (
+        <div className={styles.warning} role="alert">
+          <strong>ส่งตำแหน่งไม่สำเร็จหลายครั้ง</strong>
+          <p>ระบบเก็บจุดล่าสุดไว้รอส่งซ้ำเมื่อออนไลน์ ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
         </div>
       ) : null}
 
