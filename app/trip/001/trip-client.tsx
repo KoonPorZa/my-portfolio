@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveTracker } from "./live-tracker";
 import styles from "./trip.module.css";
 
 type Stop = {
@@ -323,7 +324,13 @@ function StopRow({ stop, index }: { stop: TimedStop; index: number }) {
   );
 }
 
-export function Trip01Client({ fontClassName }: { fontClassName: string }) {
+export function Trip01Client({
+  fontClassName,
+  gpsEnabled,
+}: {
+  fontClassName: string;
+  gpsEnabled: boolean;
+}) {
   return (
     <main className={cx(styles.tripRoot, fontClassName)}>
       <div className={styles.tripPage}>
@@ -376,6 +383,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             </button>
           </div>
         </header>
+
+        {gpsEnabled ? <LiveTracker gpsEnabled={gpsEnabled} /> : null}
 
         <section className={styles.block}>
           <SectionHead index="01" eyebrow="Route rules" title="กฎ 3 ข้อของทริปนี้" />
