@@ -46,7 +46,7 @@ export function Hero() {
             <span className="h-1.5 w-1.5 rounded-full bg-lime shadow-[0_0_8px_var(--color-lime)]" />
             <span className="text-lime">{profile.status}</span>
           </span>
-          <span className="text-line">//</span>
+          <span className="text-line">{"//"}</span>
           <span>{profile.location}</span>
         </div>
 

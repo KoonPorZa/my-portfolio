@@ -2,8 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { profile, stack } from "@/lib/data";
-import { Grain } from "@/components/ui/grain";
-import { Nav } from "@/components/nav";
+import { SiteChrome } from "@/components/site-chrome";
 
 const display = Chakra_Petch({
   subsets: ["latin", "thai"],
@@ -71,8 +70,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${mono.variable}`}>
       <body>
-        <Grain />
-        <Nav />
+        <SiteChrome />
         {children}
       </body>
     </html>
