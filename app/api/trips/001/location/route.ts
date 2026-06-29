@@ -22,6 +22,10 @@ export const dynamic = "force-dynamic";
 
 const MIN_UPLOAD_INTERVAL_MS = WAITING_POLL_MS;
 const MAX_SESSION_ID_LENGTH = 128;
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store",
+  "CDN-Cache-Control": "no-store",
+};
 
 type ApiErrorCode = "invalid_payload" | "invalid_token" | "forbidden" | "too_frequent";
 
@@ -318,9 +322,7 @@ function errorResponse(status: number, code: ApiErrorCode, message: string) {
 function jsonResponse<T>(body: T, status: number): Response {
   return Response.json(body, {
     status,
-    headers: {
-      "Cache-Control": "no-store",
-    },
+    headers: NO_STORE_HEADERS,
   });
 }
 

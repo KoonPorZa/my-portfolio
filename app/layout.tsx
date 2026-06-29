@@ -3,6 +3,7 @@ import { Chakra_Petch, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { profile, stack } from "@/lib/data";
 import { SiteChrome } from "@/components/site-chrome";
+import { CfWebAnalytics } from "@/components/cf-web-analytics";
 
 const display = Chakra_Petch({
   subsets: ["latin", "thai"],
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <SiteChrome />
         {children}
+        <CfWebAnalytics />
       </body>
     </html>
   );

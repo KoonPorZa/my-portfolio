@@ -11,6 +11,10 @@ const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 const OWNER_CODE_HASH_ENV = "TRIP_GPS_OWNER_CODE_HASH";
 const OWNER_CODE_SHA256_ENV = "TRIP_GPS_OWNER_CODE_SHA256";
 const OWNER_CODE_ENV = "TRIP_GPS_OWNER_CODE";
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store",
+  "CDN-Cache-Control": "no-store",
+};
 
 type ApiErrorCode =
   | "invalid_owner_code"
@@ -227,9 +231,7 @@ function errorResponse(status: number, code: ApiErrorCode, message: string) {
 function jsonResponse<T>(body: T, status: number): Response {
   return Response.json(body, {
     status,
-    headers: {
-      "Cache-Control": "no-store",
-    },
+    headers: NO_STORE_HEADERS,
   });
 }
 
