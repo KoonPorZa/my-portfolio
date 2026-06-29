@@ -78,46 +78,50 @@ type StopSessionResponse = {
 };
 
 const modeLabels: Record<TrackerMode, string> = {
-  active: `Active · ${formatCadence(intervalForMode("active"))}`,
-  city: `City approach · ${formatCadence(intervalForMode("city"))}`,
-  saver: `Battery saver · ${formatCadence(intervalForMode("saver"))}`,
-  rest: `Rest · ${formatCadence(intervalForMode("rest"))}`,
+  active: `ปกติ · ${formatCadence(intervalForMode("active"))}`,
+  city: `เข้าเมือง · ${formatCadence(intervalForMode("city"))}`,
+  saver: `ประหยัดแบต · ${formatCadence(intervalForMode("saver"))}`,
+  rest: `พัก · ${formatCadence(intervalForMode("rest"))}`,
+};
+
+const modeShortcutLabels: Record<TrackerMode, string> = {
+  active: "ปกติ",
+  city: "เข้าเมือง",
+  saver: "ประหยัดแบต",
+  rest: "พัก",
 };
 
 const modeShortcuts: Array<{ mode: TrackerMode; label: string }> = TRACKER_MODES.map(
   (trackerMode) => ({
     mode: trackerMode,
-    label:
-      trackerMode === "city"
-        ? "City approach"
-        : trackerMode.charAt(0).toUpperCase() + trackerMode.slice(1),
+    label: modeShortcutLabels[trackerMode],
   })
 );
 
 const permissionLabels: Record<PermissionStatus, string> = {
-  "not-requested": "Not requested",
-  granted: "Granted",
-  denied: "Denied",
-  unsupported: "Unsupported",
+  "not-requested": "ยังไม่ขอสิทธิ์",
+  granted: "อนุญาต",
+  denied: "ถูกปฏิเสธ",
+  unsupported: "ไม่รองรับ",
 };
 
 const uploadLabels: Record<UploadStatus, string> = {
-  idle: "Idle",
-  capturing: "Reading GPS",
-  uploading: "Uploading",
-  sent: "Sent",
-  queued: "Queued",
-  rejected: "Rejected",
-  error: "Error",
+  idle: "—",
+  capturing: "กำลังอ่าน GPS",
+  uploading: "กำลังอัปโหลด",
+  sent: "ส่งแล้ว",
+  queued: "รอส่ง",
+  rejected: "ถูกปฏิเสธ",
+  error: "ผิดพลาด",
 };
 
 const wakeLockLabels: Record<WakeLockStatus, string> = {
-  off: "Off",
-  requesting: "Requesting",
-  active: "Active",
-  released: "Released",
-  unsupported: "Unsupported",
-  error: "Unavailable",
+  off: "ปิด",
+  requesting: "ขอแล้ว",
+  active: "เปิด",
+  released: "ปล่อยแล้ว",
+  unsupported: "ไม่รองรับ",
+  error: "ใช้ไม่ได้",
 };
 
 function cx(...classes: Array<string | false | null | undefined>) {
@@ -127,7 +131,7 @@ function cx(...classes: Array<string | false | null | undefined>) {
 function readCurrentPosition(): Promise<GeolocationPosition> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
-      reject(new Error("navigator.geolocation is not available in this browser."));
+      reject(new Error("เบราว์เซอร์นี้ไม่รองรับระบบตำแหน่ง"));
       return;
     }
 
@@ -163,7 +167,7 @@ function snapshotFromPosition(position: GeolocationPosition): PositionSnapshot |
 
 function formatCountdown(ms: number) {
   if (ms <= 0) {
-    return "Now";
+    return "ตอนนี้";
   }
 
   const totalSeconds = Math.ceil(ms / TICK_MS);
@@ -183,7 +187,7 @@ function formatCadence(ms: number) {
 
 function formatClock(value: string | null) {
   if (!value) {
-    return "None";
+    return "—";
   }
 
   return new Intl.DateTimeFormat("th-TH", {
@@ -206,11 +210,11 @@ function isGeolocationPositionError(error: unknown): error is GeolocationPositio
 function geolocationErrorMessage(error: unknown) {
   if (isGeolocationPositionError(error)) {
     if (error.code === GEO_PERMISSION_DENIED) {
-      return "ปิดสิทธิ์ตำแหน่งอยู่ เปิด Location ให้เว็บนี้ใน browser settings แล้วลองใหม่";
+      return "ปิดสิทธิ์ตำแหน่งอยู่ เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในการตั้งค่าเบราว์เซอร์ แล้วลองใหม่";
     }
 
     if (error.code === GEO_POSITION_UNAVAILABLE) {
-      return "อ่านตำแหน่งไม่ได้ ตรวจ Location Services และขยับไปจุดที่สัญญาณชัดขึ้น";
+      return "อ่านตำแหน่งไม่ได้ ตรวจบริการตำแหน่งและขยับไปจุดที่สัญญาณชัดขึ้น";
     }
 
     if (error.code === GEO_TIMEOUT) {
@@ -218,7 +222,7 @@ function geolocationErrorMessage(error: unknown) {
     }
   }
 
-  return error instanceof Error ? error.message : "GPS capture failed.";
+  return error instanceof Error ? error.message : "จับตำแหน่ง GPS ไม่สำเร็จ";
 }
 
 function isPermissionDenied(error: unknown) {
@@ -241,11 +245,11 @@ async function createLiveSession(code: string): Promise<CreateSessionResponse> {
   const body = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(apiErrorMessage(body, response.status, "Could not create a GPS session."));
+    throw new Error(apiErrorMessage(body, response.status, "สร้างเซสชัน GPS ไม่สำเร็จ"));
   }
 
   if (!isCreateSessionResponse(body)) {
-    throw new Error("GPS session response was invalid.");
+    throw new Error("ข้อมูลเซสชัน GPS จากเซิร์ฟเวอร์ไม่ถูกต้อง");
   }
 
   return body;
@@ -268,11 +272,11 @@ async function stopLiveSession(
   const body = await readJson(response);
 
   if (!response.ok) {
-    throw new Error(apiErrorMessage(body, response.status, "Could not stop the GPS session."));
+    throw new Error(apiErrorMessage(body, response.status, "หยุดเซสชัน GPS ไม่สำเร็จ"));
   }
 
   if (!isStopSessionResponse(body)) {
-    throw new Error("GPS stop response was invalid.");
+    throw new Error("ข้อมูลหยุดเซสชัน GPS จากเซิร์ฟเวอร์ไม่ถูกต้อง");
   }
 
   return body;
@@ -288,10 +292,10 @@ async function readJson(response: Response): Promise<unknown> {
 
 function apiErrorMessage(body: unknown, status: number, fallback: string): string {
   if (isRecord(body) && typeof body.message === "string" && body.message.trim()) {
-    return `${body.message} Status ${status}.`;
+    return `${body.message} สถานะ ${status}.`;
   }
 
-  return `${fallback} Status ${status}.`;
+  return `${fallback} สถานะ ${status}.`;
 }
 
 function isCreateSessionResponse(value: unknown): value is CreateSessionResponse {
@@ -494,7 +498,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     ) => {
       if (!sessionId) {
         setUploadStatus("error");
-        setLastError("No GPS session is active yet.");
+        setLastError("ยังไม่มีเซสชัน GPS ที่ใช้งานอยู่");
         return false;
       }
 
@@ -502,7 +506,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
       if (!ownerToken) {
         setUploadStatus("error");
-        setLastError("No GPS owner token is active yet.");
+        setLastError("ยังไม่มีโทเคนเจ้าของ GPS ที่ใช้งานอยู่");
         return false;
       }
 
@@ -538,14 +542,14 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         setUploadStatus(result.queued ? "queued" : "rejected");
         setConsecutiveUploadFailures((current) => current + 1);
         setLastError(
-          `${result.message}${result.status ? ` Status ${result.status}.` : ""}`
+          `${result.message}${result.status ? ` สถานะ ${result.status}.` : ""}`
         );
 
         return true;
       } catch (error) {
         setUploadStatus("error");
         setConsecutiveUploadFailures((current) => current + 1);
-        setLastError(error instanceof Error ? error.message : "GPS upload failed.");
+        setLastError(error instanceof Error ? error.message : "อัปโหลด GPS ไม่สำเร็จ");
         return true;
       }
     },
@@ -557,7 +561,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       if (permission === "unsupported" || typeof navigator === "undefined" || !("geolocation" in navigator)) {
         setPermission("unsupported");
         setUploadStatus("error");
-        setLastError("This browser does not support navigator.geolocation.");
+        setLastError("เบราว์เซอร์นี้ไม่รองรับระบบตำแหน่ง");
         return false;
       }
 
@@ -569,7 +573,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
         if (!snapshot) {
           setUploadStatus("error");
-          setLastError("GPS returned invalid coordinates.");
+          setLastError("GPS ส่งพิกัดไม่ถูกต้อง");
           return false;
         }
 
@@ -615,7 +619,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     const code = ownerCode.trim();
 
     if (!code) {
-      setLastError("Enter the live-share code before starting.");
+      setLastError("ใส่โค้ดแชร์สดก่อนเริ่ม");
       return;
     }
 
@@ -657,7 +661,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       ownerTokenRef.current = null;
       sessionIdRef.current = null;
       setSessionExpiresAt(null);
-      setLastError(error instanceof Error ? error.message : "Could not start live GPS sharing.");
+      setLastError(error instanceof Error ? error.message : "เริ่มแชร์ GPS สดไม่สำเร็จ");
     } finally {
       setIsStarting(false);
     }
@@ -710,7 +714,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       );
     } else {
       setUploadStatus("error");
-      setLastError("No active GPS session is available for the stop ping.");
+      setLastError("ไม่มีเซสชัน GPS ที่ใช้งานอยู่สำหรับส่งจุดหยุด");
     }
 
     if (!ownerToken || !sessionId) {
@@ -725,7 +729,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       setSessionExpiresAt(null);
     } catch (error) {
       setUploadStatus("error");
-      setLastError(error instanceof Error ? error.message : "Could not stop live GPS sharing.");
+      setLastError(error instanceof Error ? error.message : "หยุดแชร์ GPS สดไม่สำเร็จ");
     } finally {
       setIsStopping(false);
     }
@@ -749,7 +753,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         setCopied(false);
       }, COPY_RESET_MS);
     } catch {
-      setLastError("Could not copy the viewer link in this browser.");
+      setLastError("คัดลอกลิงก์ผู้ชมในเบราว์เซอร์นี้ไม่สำเร็จ");
     }
   }, [viewerLink]);
 
@@ -764,7 +768,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
   const isBusy =
     isStarting || isStopping || uploadStatus === "capturing" || uploadStatus === "uploading";
-  const nextSendLabel = isSharing && nextSendAt ? formatCountdown(nextSendAt - now) : "Paused";
+  const nextSendLabel = isSharing && nextSendAt ? formatCountdown(nextSendAt - now) : "หยุดชั่วคราว";
   const hasTokenedViewerLink = viewerLink.includes("?t=");
   const canStart = ownerCode.trim().length > 0;
   const wakeLockTone: StatusTone =
@@ -783,26 +787,26 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
   const statusItems = useMemo(
     () => [
-      { label: "Permission", value: permissionLabels[permission], tone: permissionTone },
+      { label: "สิทธิ์ตำแหน่ง", value: permissionLabels[permission], tone: permissionTone },
       {
-        label: "Mode",
+        label: "โหมด",
         value: modeLabels[mode],
         tone: mode === "active" || mode === "city" ? "good" : "warn",
       },
-      { label: "Next send", value: nextSendLabel, tone: isSharing ? "good" : "neutral" },
-      { label: "Last sent", value: formatClock(lastSentAt), tone: lastSentAt ? "good" : "neutral" },
+      { label: "ส่งถัดไป", value: nextSendLabel, tone: isSharing ? "good" : "neutral" },
+      { label: "ส่งล่าสุด", value: formatClock(lastSentAt), tone: lastSentAt ? "good" : "neutral" },
       {
-        label: "Accuracy",
-        value: lastAccuracy === null ? "None" : `±${Math.round(lastAccuracy)}m`,
+        label: "ความแม่นยำ",
+        value: lastAccuracy === null ? "—" : `±${Math.round(lastAccuracy)}m`,
         tone: lastAccuracy === null ? "neutral" : hasPoorAccuracy ? "warn" : "good",
       },
-      { label: "Upload", value: uploadLabels[uploadStatus], tone: statusTone(uploadStatus) },
+      { label: "อัปโหลด", value: uploadLabels[uploadStatus], tone: statusTone(uploadStatus) },
       {
-        label: "Expires",
-        value: sessionExpiresAt ? formatClock(sessionExpiresAt) : "No session",
+        label: "หมดอายุ",
+        value: sessionExpiresAt ? formatClock(sessionExpiresAt) : "ยังไม่มีเซสชัน",
         tone: sessionExpiresAt ? "warn" : "neutral",
       },
-      { label: "Wake lock", value: wakeLockLabels[wakeLockStatus], tone: wakeLockTone },
+      { label: "กันจอดับ", value: wakeLockLabels[wakeLockStatus], tone: wakeLockTone },
     ],
     [
       isSharing,
@@ -828,30 +832,30 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     <section className={styles.tracker} aria-labelledby="live-tracker-title">
       <div className={styles.trackerTop}>
         <div>
-          <p className={styles.eyebrow}>Live Location</p>
-          <h2 id="live-tracker-title">GPS share panel</h2>
+          <p className={styles.eyebrow}>ตำแหน่งสด</p>
+          <h2 id="live-tracker-title">แผงแชร์ GPS</h2>
         </div>
         <span className={cx(styles.liveBadge, isSharing ? styles.liveBadgeOn : styles.liveBadgeOff)}>
-          {isSharing ? "Live" : "Off"}
+          {isSharing ? "สด" : "ปิด"}
         </span>
       </div>
 
       <p className={styles.lead}>
-        Starts only from this button tap. Before Start sharing, no GPS position is read and nothing is uploaded.
+        เริ่มส่งจากปุ่มนี้เท่านั้น ก่อนกดเริ่มแชร์ ระบบจะไม่อ่าน GPS และไม่อัปโหลดอะไร
       </p>
 
-      <div className={styles.preflight} aria-label="Pre-start checklist">
-        <span className={styles.preflightTag}>Pre-start</span>
+      <div className={styles.preflight} aria-label="เช็กลิสต์ก่อนเริ่ม">
+        <span className={styles.preflightTag}>ก่อนเริ่ม</span>
         <ul>
-          <li>Turn on phone GPS / Location Services.</li>
-          <li className={secureContext === false ? styles.alertItem : undefined}>Open this page over HTTPS.</li>
-          <li>Bring a power bank and charging cable.</li>
-          <li>Browser updates may pause when the screen locks or this tab is hidden.</li>
+          <li>เปิด GPS / บริการตำแหน่งในมือถือ</li>
+          <li className={secureContext === false ? styles.alertItem : undefined}>เปิดหน้านี้ผ่าน HTTPS</li>
+          <li>พกพาวเวอร์แบงก์และสายชาร์จ</li>
+          <li>ถ้าหน้าจอล็อกหรือซ่อนแท็บ เบราว์เซอร์อาจหยุดส่งชั่วคราว</li>
         </ul>
       </div>
 
       <label className={styles.codeBox} htmlFor="trip-gps-owner-code">
-        <span className={styles.viewerLabel}>Live-share code</span>
+        <span className={styles.viewerLabel}>โค้ดแชร์สด</span>
         <input
           id="trip-gps-owner-code"
           name="trip-gps-owner-code"
@@ -859,21 +863,21 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           value={ownerCode}
           autoComplete="off"
           inputMode="text"
-          placeholder="Server owner code"
+          placeholder="โค้ดเจ้าของจากเซิร์ฟเวอร์"
           disabled={isSharing || isBusy}
           onChange={(event) => setOwnerCode(event.target.value)}
         />
-        <span>Required before Start because this trip page is public.</span>
+        <span>ต้องใส่ก่อนเริ่ม เพราะหน้าทริปนี้เป็นสาธารณะ</span>
       </label>
 
-      <div className={styles.controls} aria-label="Live location controls">
+      <div className={styles.controls} aria-label="ปุ่มควบคุมตำแหน่งสด">
         <button
           className={styles.primaryAction}
           type="button"
           onClick={() => void handleStart()}
           disabled={isSharing || isBusy || permission === "unsupported" || !canStart}
         >
-          {isStarting ? "Starting..." : "Start sharing"}
+          {isStarting ? "กำลังเริ่ม..." : "เริ่มแชร์"}
         </button>
         <button
           className={styles.stopAction}
@@ -881,7 +885,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           onClick={() => void handleStop()}
           disabled={!isSharing || isStopping}
         >
-          {isStopping ? "Stopping..." : "Stop sharing"}
+          {isStopping ? "กำลังหยุด..." : "หยุดแชร์"}
         </button>
         <button
           className={styles.secondaryAction}
@@ -889,11 +893,11 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           onClick={() => void handleManualPing()}
           disabled={!isSharing || isBusy}
         >
-          Manual ping
+          ส่งจุดเอง
         </button>
       </div>
 
-      <div className={styles.modeShortcuts} aria-label="GPS cadence shortcuts">
+      <div className={styles.modeShortcuts} aria-label="ทางลัดรอบส่ง GPS">
         {modeShortcuts.map((shortcut) => (
           <button
             key={shortcut.mode}
@@ -918,9 +922,9 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
       <div className={styles.viewerBox}>
         <div>
-          <span className={styles.viewerLabel}>Viewer link</span>
+          <span className={styles.viewerLabel}>ลิงก์ผู้ชม</span>
           <code>{viewerLink}</code>
-          <p>{hasTokenedViewerLink ? "Share this tokened link with viewers." : "Start a session to mint a viewer token."}</p>
+          <p>{hasTokenedViewerLink ? "ส่งลิงก์นี้ให้ผู้ชม" : "เริ่มเซสชันเพื่อออกโทเคนผู้ชม"}</p>
         </div>
         <button
           className={styles.copyButton}
@@ -928,16 +932,16 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           onClick={() => void handleCopyViewerLink()}
           disabled={!hasTokenedViewerLink}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? "คัดลอกแล้ว" : "คัดลอก"}
         </button>
       </div>
 
       {permission === "denied" ? (
         <div className={styles.warning} role="alert">
           <strong>ปิดสิทธิ์ตำแหน่งอยู่</strong>
-          <p>เปิด Location ให้เว็บนี้ใน browser settings แล้วกด Retry ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+          <p>เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในการตั้งค่าเบราว์เซอร์ แล้วลองใหม่ ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
           <button className={styles.retryButton} type="button" onClick={handleRetry}>
-            Retry permission
+            ลองขอสิทธิ์อีกครั้ง
           </button>
         </div>
       ) : null}
@@ -945,7 +949,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       {permission === "unsupported" ? (
         <div className={styles.warning} role="alert">
           <strong>เบราว์เซอร์นี้ไม่รองรับ GPS</strong>
-          <p>ใช้ mobile browser ที่รองรับ navigator.geolocation ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+          <p>ใช้เบราว์เซอร์มือถือที่รองรับระบบตำแหน่ง ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
         </div>
       ) : null}
 
