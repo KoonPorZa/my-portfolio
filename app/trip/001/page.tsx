@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans_Thai, IBM_Plex_Mono } from "next/font/google";
-import { isGpsEnabled } from "@/lib/trip-gps/config";
 import { Trip01Client } from "./trip-client";
 
 const sans = IBM_Plex_Sans_Thai({
@@ -29,7 +28,5 @@ export const viewport: Viewport = {
 };
 
 export default function Trip01Page() {
-  const gpsEnabled = isGpsEnabled();
-
-  return <Trip01Client fontClassName={`${sans.variable} ${mono.variable}`} gpsEnabled={gpsEnabled} />;
+  return <Trip01Client fontClassName={`${sans.variable} ${mono.variable}`} />;
 }
