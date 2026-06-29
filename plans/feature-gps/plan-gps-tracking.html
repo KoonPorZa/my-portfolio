@@ -370,6 +370,7 @@ git switch feat/gps</code></pre>
         <li><a href="#architecture">Architecture</a></li>
         <li><a href="#tech-stack">Tech stack decision</a></li>
         <li><a href="#cost-guard">Cost guard</a></li>
+        <li><a href="#cloudflare-edge">Cloudflare edge layer</a></li>
         <li><a href="#viewer-owner-flow">Viewer & owner GPS flow</a></li>
         <li><a href="#phases">Implementation phases</a></li>
         <li><a href="#files">ไฟล์ที่คาดว่าจะเปลี่ยน</a></li>
@@ -683,6 +684,12 @@ git switch feat/gps</code></pre>
               <td>traffic สูง, public app, ต้องการ SLA/offline/prefetch → ใช้ paid tile provider เช่น MapTiler/Mapbox/Google Maps</td>
             </tr>
             <tr>
+              <td>Cloudflare DNS/Proxy/WAF/Web Analytics</td>
+              <td>0 บาทถ้าอยู่ใน subscription/free quota ที่มีอยู่</td>
+              <td>ใช้เฉพาะ DNS proxy, WAF/rate limiting rules และ analytics แบบ aggregate; ไม่เพิ่ม Workers/D1/Durable Objects ใน MVP</td>
+              <td>อาจมีค่าใช้จ่ายถ้าใช้ feature plan-specific, logs/analytics ขั้นสูง, traffic สูง หรือเปิดบริการ Cloudflare อื่นเพิ่ม</td>
+            </tr>
+            <tr>
               <td>Native app / background tracking</td>
               <td>ยังไม่ทำใน MVP</td>
               <td>ใช้ web-only ก่อน</td>
@@ -698,9 +705,89 @@ git switch feat/gps</code></pre>
       </div>
     </section>
 
+    <section id="cloudflare-edge">
+      <div class="section-head">
+        <p class="eyebrow">06 · Cloudflare edge layer</p>
+        <h2>Cloudflare services ที่เลือกใช้: DNS/Proxy/CDN, WAF Rate Limiting, Web Analytics</h2>
+        <p class="subtitle" style="margin-top:12px">
+          Cloudflare ในแผนนี้เป็นชั้นหน้าเว็บ ไม่ใช่ backend server เพิ่ม: ให้ request ผ่าน Cloudflare ก่อนถึง Vercel เพื่อเปิด security, rate-limit และ analytics แบบไม่เปลี่ยน Next.js full-stack architecture เดิม
+        </p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>ใช้ทำอะไรในโปรเจ็คนี้</th>
+              <th>Setup ในแผน</th>
+              <th>Guardrail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1. DNS / Proxy / CDN</td>
+              <td>ให้ domain เช่น <code>koonporza.com</code> วิ่งผ่าน Cloudflare orange-cloud proxy ก่อนถึง Vercel เพื่อใช้ Cloudflare protection, cache/static optimization, HTTP analytics และ WAF rules</td>
+              <td>
+                <ul>
+                  <li>ตั้ง DNS record ของเว็บเป็น Proxied ถ้า record นั้น serve HTTP/HTTPS traffic</li>
+                  <li>คง Vercel verification/TXT หรือ record ที่ไม่ใช่ web traffic เป็น DNS-only ตามที่ provider ต้องการ</li>
+                  <li>ตั้ง SSL/TLS เป็น Full/Strict เมื่อ certificate ฝั่ง origin พร้อม</li>
+                  <li>ห้าม cache API location; cache ได้เฉพาะ static assets/page ที่ปลอดภัย</li>
+                </ul>
+              </td>
+              <td>อย่าเปิด cache rule ครอบ <code>/api/trips/trip-01/*</code> หรือ <code>/trip-01/live*</code>; location response ต้องเป็น dynamic และไม่ cache</td>
+            </tr>
+            <tr>
+              <td>2. WAF + Rate Limiting</td>
+              <td>กัน bot/spam/brute-force ที่ยิง location API หรือ viewer token endpoint ก่อน request ถึง Vercel/Supabase</td>
+              <td>
+                <ul>
+                  <li>Custom WAF rule scope: <code>/api/trips/trip-01/location*</code>, session endpoints, และ optional <code>/trip-01/live*</code></li>
+                  <li>Rate limit POST owner upload สูงกว่าปกติไม่ได้ เช่นเกินประมาณ 10–20 request/min/IP ให้ challenge/block</li>
+                  <li>Rate limit GET viewer latest ให้สูงกว่าการ poll ปกติ เช่น 30–60 request/min/IP เพื่อไม่กระทบ viewer polling 30–60 วินาที</li>
+                  <li>ยังต้องมี server-side token validation/rate limit ใน Next Route Handler เสมอ</li>
+                </ul>
+              </td>
+              <td>WAF เป็น defense-in-depth ไม่ใช่ auth; ถ้า Cloudflare rule พลาด API route ต้องยัง reject invalid token/payload ได้เอง</td>
+            </tr>
+            <tr>
+              <td>6. Web Analytics</td>
+              <td>ดู traffic/performance แบบ aggregate ของ portfolio, <code>/trip-01</code>, และหน้า public ที่ไม่ sensitive</td>
+              <td>
+                <ul>
+                  <li>เพิ่ม Cloudflare Web Analytics beacon เฉพาะ layout/page ที่ไม่ส่ง token ใน URL</li>
+                  <li>ใช้ดู page views, device/browser, performance trend หลัง deploy</li>
+                  <li>ถ้าจะ track viewer page ให้ทำเฉพาะแบบ sanitized route ที่ไม่มี token/query หรือใช้ internal view counter แทน</li>
+                </ul>
+              </td>
+              <td>ห้ามฝัง analytics บน URL ที่มี viewer token เช่น <code>/trip-01/live?t=...</code>; token ไม่ควรถูกส่งเข้า analytics/log ภายนอก</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="two-grid" style="margin-top:16px">
+        <article class="decision">
+          <span class="tag green">Implementation note</span>
+          <h3 style="margin-top:12px">ยังไม่ต้อง deploy backend ใหม่</h3>
+          <p>
+            Cloudflare layer นี้อยู่หน้า Vercel เท่านั้น: Next Route Handlers ยังเป็น backend API เดิม, Supabase ยังเป็น database เดิม, และ branch implementation ยังคือ <code>feat/gps</code>
+          </p>
+        </article>
+        <article class="decision">
+          <span class="tag red">Sensitive URL rule</span>
+          <h3 style="margin-top:12px">อย่าให้ token อยู่ใน analytics</h3>
+          <p>
+            ถ้า viewer token อยู่ใน query/path ให้ปิด analytics beacon บน viewer page หรือเปลี่ยนเป็น flow ที่ไม่ expose token ใน URL analytics ก่อนเปิด Web Analytics กับหน้านั้น
+          </p>
+        </article>
+      </div>
+    </section>
+
     <section id="viewer-owner-flow">
       <div class="section-head">
-        <p class="eyebrow">06 · Viewer & owner GPS flow</p>
+        <p class="eyebrow">07 · Viewer & owner GPS flow</p>
         <h2>รายละเอียดที่ต้องทำสำหรับคนดู และส่วนที่คุณต้องเปิด GPS</h2>
         <p class="subtitle" style="margin-top:12px">
           ฟีเจอร์นี้มี 2 ฝั่งที่ต้องออกแบบให้ชัด: ฝั่ง viewer ที่เปิดดูแบบ read-only และฝั่ง rider/owner ที่ต้องเปิด GPS + กดเริ่มแชร์เองก่อนตำแหน่งจะถูกส่งออกไป
@@ -840,7 +927,7 @@ git switch feat/gps</code></pre>
 
     <section id="phases">
       <div class="section-head">
-        <p class="eyebrow">07 · Implementation phases</p>
+        <p class="eyebrow">08 · Implementation phases</p>
         <h2>ลำดับงานที่ต้องทำ</h2>
       </div>
 
@@ -930,6 +1017,20 @@ git switch feat/gps</code></pre>
 
         <article class="phase">
           <div>
+            <h3>Cloudflare edge protection + analytics <span class="tag orange">P1</span></h3>
+            <p>ตั้งค่า Cloudflare ที่ dashboard/domain level ให้รองรับ GPS feature โดยไม่เพิ่ม backend server แยก</p>
+            <ul>
+              <li>เปิด DNS proxy/orange cloud สำหรับ hostname ที่ serve เว็บจริง และยืนยันว่า Vercel origin ยังตอบ HTTPS ได้</li>
+              <li>สร้าง WAF/rate limiting rules สำหรับ <code>/api/trips/trip-01/location*</code> และ session endpoints</li>
+              <li>ตั้ง cache bypass/no-store สำหรับ location API และ viewer latest response</li>
+              <li>เพิ่ม Web Analytics เฉพาะ non-sensitive pages; ไม่ฝังบน viewer URL ที่มี token/query</li>
+              <li>บันทึก rule names/thresholds ใน deployment notes เพื่อ rollback/debug ได้</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
             <h3>Security & token lifecycle <span class="tag orange">P1</span></h3>
             <p>ทำให้แชร์ได้เฉพาะคนที่มีลิงก์ และหยุดแชร์ได้ทันที</p>
             <ul>
@@ -970,7 +1071,7 @@ git switch feat/gps</code></pre>
 
     <section id="files">
       <div class="section-head">
-        <p class="eyebrow">08 · File impact</p>
+        <p class="eyebrow">09 · File impact</p>
         <h2>ไฟล์ที่คาดว่าจะสร้าง/แก้</h2>
       </div>
 
@@ -991,6 +1092,11 @@ git switch feat/gps</code></pre>
           <small>Route Handler สำหรับ upload/latest/session lifecycle</small>
         </article>
         <article class="file-card">
+          <h3>Cloudflare config notes</h3>
+          <p><code>plans/feature-gps/plan-gps-tracking.html</code><br />Cloudflare dashboard rules</p>
+          <small>WAF/rate limit/cache/analytics เป็น dashboard-level config; ถ้าทำ automation ภายหลังค่อยเพิ่ม Wrangler/Terraform</small>
+        </article>
+        <article class="file-card">
           <h3>Domain logic</h3>
           <p><code>lib/trip-gps/types.ts</code><br /><code>lib/trip-gps/cadence.ts</code><br /><code>lib/trip-gps/store.ts</code><br /><code>lib/trip-gps/token.ts</code></p>
           <small>แยก logic เพื่อทดสอบและลด client bundle</small>
@@ -1000,7 +1106,7 @@ git switch feat/gps</code></pre>
 
     <section id="data">
       <div class="section-head">
-        <p class="eyebrow">09 · Data & API contract</p>
+        <p class="eyebrow">10 · Data & API contract</p>
         <h2>สัญญาข้อมูลที่ควรกำหนดก่อน coding</h2>
       </div>
 
@@ -1080,7 +1186,7 @@ Authorization: Bearer &lt;owner-token&gt;
 
     <section id="acceptance">
       <div class="section-head">
-        <p class="eyebrow">10 · Acceptance criteria</p>
+        <p class="eyebrow">11 · Acceptance criteria</p>
         <h2>เกณฑ์รับงานที่ทดสอบได้</h2>
       </div>
 
@@ -1097,6 +1203,9 @@ Authorization: Bearer &lt;owner-token&gt;
             <li>viewer แสดง stale เมื่อ latest เกิน 15 นาที และ offline เมื่อเกิน 30 นาที</li>
             <li>owner panel มี checklist เปิด GPS/Location Services, permission retry, viewer link copy, Start/Stop/Manual ping/Rest mode</li>
             <li>owner กด Start เท่านั้นจึงเรียก permission และเริ่มส่งตำแหน่ง; ก่อนกด Start ไม่มีการส่ง location ออกไป</li>
+            <li>Cloudflare DNS proxy เปิดสำหรับ hostname เว็บจริง และ API location ไม่ถูก cache</li>
+            <li>Cloudflare WAF/rate limiting ไม่บล็อก viewer polling ปกติ แต่ challenge/block request burst ที่ผิดปกติ</li>
+            <li>Web Analytics ไม่ถูกฝังบน viewer URL ที่มี token/query หรือมีแผน sanitize URL ก่อน track</li>
           </ul>
         </article>
         <article class="verify-card">
@@ -1115,7 +1224,7 @@ Authorization: Bearer &lt;owner-token&gt;
 
     <section id="verification">
       <div class="section-head">
-        <p class="eyebrow">11 · Verification plan</p>
+        <p class="eyebrow">12 · Verification plan</p>
         <h2>วิธีตรวจงานก่อน merge</h2>
       </div>
 
@@ -1128,6 +1237,8 @@ Authorization: Bearer &lt;owner-token&gt;
             <li><code>npm run build</code></li>
             <li>ตรวจว่า route handlers ไม่ cache latest location ผิดพลาด</li>
             <li>ตรวจว่า env names แยก public/server-only ถูกต้อง</li>
+            <li>ตรวจ response headers/API behavior ว่า location API เป็น dynamic/no-store และไม่ถูก Cloudflare cache</li>
+            <li>ตรวจ Cloudflare rule preview/logs ว่า WAF/rate limiting match เฉพาะ endpoint ที่ตั้งใจ</li>
           </ul>
         </article>
         <article class="verify-card">
@@ -1150,6 +1261,7 @@ Authorization: Bearer &lt;owner-token&gt;
             <li>viewer token POST ไม่ได้</li>
             <li>expired/revoked token ถูก reject</li>
             <li>Stop sharing ทำให้ viewer เห็น stopped state</li>
+            <li>ทดสอบว่า viewer token ไม่ถูกส่งเข้า analytics beacon/network request ที่ไม่จำเป็น</li>
           </ul>
         </article>
       </div>
@@ -1157,7 +1269,7 @@ Authorization: Bearer &lt;owner-token&gt;
 
     <section id="risks">
       <div class="section-head">
-        <p class="eyebrow">12 · Risks & mitigations</p>
+        <p class="eyebrow">13 · Risks & mitigations</p>
         <h2>ความเสี่ยงที่ต้องคุม</h2>
       </div>
 
@@ -1191,6 +1303,18 @@ Authorization: Bearer &lt;owner-token&gt;
               <td>review bundle/env usage</td>
             </tr>
             <tr>
+              <td>Cloudflare WAF/rate limit false positive</td>
+              <td>viewer หรือ owner upload ถูก block ระหว่างทริป</td>
+              <td>ตั้ง threshold สูงกว่า polling/upload ปกติ, มี bypass/debug plan, และ API server-side validation ยังทำงานเองได้</td>
+              <td>ทดสอบ rule ก่อนทริปจริง</td>
+            </tr>
+            <tr>
+              <td>Analytics เก็บ viewer token โดยไม่ตั้งใจ</td>
+              <td>ลิงก์ private location อาจหลุดเข้า analytics/log</td>
+              <td>ไม่ฝัง Web Analytics บน viewer URL ที่มี token/query; ใช้ sanitized route หรือ internal view counter แทน</td>
+              <td>ตรวจ network request ของ viewer page</td>
+            </tr>
+            <tr>
               <td>เพิ่ม map/realtime dependency เร็วเกินไป</td>
               <td>งานบานและค่าใช้จ่ายเพิ่ม</td>
               <td>MVP ใช้ coordinates + Google Maps link ก่อน; dependency gate แยกเป็น decision</td>
@@ -1209,7 +1333,7 @@ Authorization: Bearer &lt;owner-token&gt;
 
     <section id="handoff">
       <div class="section-head">
-        <p class="eyebrow">13 · Execution handoff</p>
+        <p class="eyebrow">14 · Execution handoff</p>
         <h2>คำแนะนำตอนนำแผนไปทำต่อ</h2>
       </div>
 

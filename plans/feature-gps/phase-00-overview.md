@@ -83,9 +83,12 @@ ACTIVE 5m · SAVER 10m · REST 15m · STALE_AFTER 15m · OFFLINE_AFTER 30m · MA
 | `phase-07-security-tokens.md` | Token lifecycle & security | P1 | 04, 05 |
 | `phase-08-reliability.md` | Reliability for real trip | P2 | 02, 04, 06 |
 | `phase-09-native-spike.md` | Native tracker spike | Future | (gated by MVP results) |
+| `phase-10-cloudflare-edge.md` | Cloudflare edge layer (DNS/WAF/analytics) | P1 | 04, 06 + deploy |
 
 **Suggested order:** 01 → 03 → 02 → 04 → 05 → 07 → 06 → 08 → (09 only if needed).
-P0–P1 = shippable MVP. P2 = hardening. Future = optional.
+Phase 10 (Cloudflare edge) is **mostly Cloudflare-dashboard config done at deploy time** — its only
+repo code (API `no-store` headers + a privacy-safe analytics beacon) can land any time after 04/06.
+P0–P1 = shippable MVP. P2 = hardening. Future = optional. Cloudflare = edge defense-in-depth, **not** auth.
 
 ## How to hand a phase to Codex
 
