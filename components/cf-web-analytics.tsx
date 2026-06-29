@@ -9,7 +9,10 @@ const liveViewerPathPattern = /^\/trip\/\d+\/live(?:\/.*)?$/;
 export function CfWebAnalytics() {
   const pathname = usePathname();
 
-  if (!beaconToken || isLiveViewerPath(pathname)) {
+  // Fail closed: usePathname() is null during SSR, so render only once we
+  // positively know a non-live path. This guarantees the beacon is never in
+  // the SSR HTML of the token-bearing viewer page (/trip/NNN/live?t=...).
+  if (!beaconToken || !pathname || isLiveViewerPath(pathname)) {
     return null;
   }
 
