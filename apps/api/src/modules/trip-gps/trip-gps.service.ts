@@ -16,10 +16,12 @@ import {
   type LocationFreshness,
   type LocationLatest,
   type LocationPayload,
+  type ProgressResponse,
   type PublicSession,
   type SessionAudit,
   type SessionEndAction,
   type ShareSession,
+  type StopArrival,
   type StopSessionResponse,
   type TrackerMode,
   type UploadLocationResponse,
@@ -38,6 +40,7 @@ export const REST_INTERVAL_MS = 15 * MINUTE_MS;
 export const STALE_AFTER_MS = 15 * MINUTE_MS;
 export const OFFLINE_AFTER_MS = 30 * MINUTE_MS;
 export const MAX_BAD_ACCURACY_M = 250;
+export const ARRIVAL_RADIUS_M = 250;
 
 export const FRESH_POLL_MS = 60 * SECOND_MS;
 export const WAITING_POLL_MS = 30 * SECOND_MS;
@@ -46,8 +49,30 @@ const MIN_UPLOAD_INTERVAL_MS = WAITING_POLL_MS;
 const MAX_SESSION_ID_LENGTH = 128;
 const DEFAULT_TTL_MS = 24 * 60 * MINUTE_MS;
 const SESSION_PREFIX = "trip01";
+const EARTH_RADIUS_M = 6_371_000;
+const DEGREES_TO_RADIANS = Math.PI / 180;
+
+// Keep this order in sync with the stops array in apps/web/app/trip/001/trip-client.tsx.
+export const TRIP_001_STOP_COORDS: [number, number][] = [
+  [7.2061568, 100.5547474],
+  [8.3378608, 99.9256754],
+  [9.14055, 99.3647639],
+  [9.9137335, 99.0604903],
+  [10.5692017, 99.116111],
+  [11.527931, 99.6206976],
+  [12.1025771, 99.8530734],
+  [12.884446, 99.912716],
+  [13.5361776, 100.2209807],
+  [13.7698852, 100.6623291],
+];
 
 type OwnerCodeStatus = "valid" | "invalid" | "not_configured";
+type ProgressAction = "set" | "clear";
+type ProgressPayload = {
+  stopIndex: number;
+  arrivedAt: string | null;
+  action: ProgressAction;
+};
 
 const trackerModes = new Set<TrackerMode>(TRACKER_MODES);
 const uploadReasons = new Set<UploadReason>(UPLOAD_REASONS);
@@ -193,14 +218,16 @@ export class TripGpsService {
       );
     }
 
+    const serverTs = nowIso(now);
     let storedLatest: LocationLatest;
 
     try {
       storedLatest = await this.repo.recordLocation({
         ...payload,
         sessionId: session.id,
-        serverTs: nowIso(now),
+        serverTs,
       });
+      await this.recordAutoStopArrivals(session.id, payload, serverTs);
     } catch (error) {
       await this.repo.recordSessionError(session.id, errorMessage(error));
       throw error;
@@ -242,6 +269,7 @@ export class TripGpsService {
     }
 
     const audit = await this.repo.recordViewerAccess(session.id, nowIso(now));
+    const stopArrivals = await this.repo.getStopArrivals(session.id);
 
     if (!session.active || session.stopped_at) {
       return viewerResponse(
@@ -249,7 +277,8 @@ export class TripGpsService {
         null,
         null,
         "Live sharing has stopped.",
-        audit
+        audit,
+        stopArrivals
       );
     }
 
@@ -261,7 +290,8 @@ export class TripGpsService {
         null,
         null,
         "Waiting for the first GPS point.",
-        audit
+        audit,
+        stopArrivals
       );
     }
 
@@ -272,8 +302,80 @@ export class TripGpsService {
       freshness,
       latest,
       messageForFreshness(freshness),
-      audit
+      audit,
+      stopArrivals
     );
+  }
+
+  async updateProgress(input: {
+    tripId: string;
+    ownerToken: string | null;
+    body: unknown;
+  }): Promise<ProgressResponse> {
+    assertMvpTrip(input.tripId);
+
+    if (!input.ownerToken) {
+      throw new ApiError(401, "invalid_token", "Invalid or missing token.");
+    }
+
+    const payload = parseProgressPayload(input.body);
+
+    if (!payload) {
+      throw new ApiError(400, "invalid_payload", "Invalid progress payload.");
+    }
+
+    const session = await this.repo.findOwnerSessionByTokenOnly(input.ownerToken);
+
+    if (!session) {
+      throw new ApiError(401, "invalid_token", "Invalid or missing token.");
+    }
+
+    if (payload.action === "clear") {
+      await this.repo.clearStopArrival(session.id, payload.stopIndex);
+    } else {
+      await this.repo.upsertManualStopArrival({
+        sessionId: session.id,
+        stopIndex: payload.stopIndex,
+        arrivedAt: payload.arrivedAt ?? nowIso(this.currentTimeMs()),
+      });
+    }
+
+    return {
+      ok: true,
+      stopArrivals: await this.repo.getStopArrivals(session.id),
+    };
+  }
+
+  private async recordAutoStopArrivals(
+    sessionId: string,
+    point: LocationPayload,
+    arrivedAt: string
+  ): Promise<void> {
+    const existingIndexes = new Set(
+      (await this.repo.getStopArrivals(sessionId)).map((arrival) => arrival.index)
+    );
+
+    for (const [index, coord] of TRIP_001_STOP_COORDS.entries()) {
+      if (existingIndexes.has(index)) {
+        continue;
+      }
+
+      if (
+        haversineMeters(point, {
+          lat: coord[0],
+          lng: coord[1],
+        }) > ARRIVAL_RADIUS_M
+      ) {
+        continue;
+      }
+
+      await this.repo.recordAutoStopArrival({
+        sessionId,
+        stopIndex: index,
+        arrivedAt,
+      });
+      existingIndexes.add(index);
+    }
   }
 
   private verifyOwnerCode(code: string | null): OwnerCodeStatus {
@@ -406,7 +508,8 @@ function viewerResponse(
   freshness: LocationFreshness | null,
   latest: LocationLatest | null,
   message: string,
-  audit: SessionAudit | null
+  audit: SessionAudit | null,
+  stopArrivals: StopArrival[]
 ): ViewerLatestResponse {
   const viewerState = viewerStateFor(status, freshness, latest);
 
@@ -415,6 +518,7 @@ function viewerResponse(
     freshness,
     viewerState,
     latest,
+    stopArrivals,
     audit,
     nextPollMs: nextPollMs(viewerState),
     message,
@@ -530,6 +634,74 @@ function sanitizeCoords(point: {
   };
 }
 
+function haversineMeters(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number }
+): number {
+  const lat1 = toRadians(a.lat);
+  const lat2 = toRadians(b.lat);
+  const deltaLat = toRadians(b.lat - a.lat);
+  const deltaLng = toRadians(b.lng - a.lng);
+  const sinLat = Math.sin(deltaLat / 2);
+  const sinLng = Math.sin(deltaLng / 2);
+  const h =
+    sinLat * sinLat +
+    Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+
+  return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function parseProgressPayload(body: unknown): ProgressPayload | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const stopIndex = body.stopIndex;
+
+  if (
+    !isNonNegativeInteger(stopIndex) ||
+    stopIndex >= TRIP_001_STOP_COORDS.length
+  ) {
+    return null;
+  }
+
+  const action = body.action ?? "set";
+
+  if (action !== "set" && action !== "clear") {
+    return null;
+  }
+
+  const arrivedAt = normalizeArrivedAt(body.arrivedAt ?? null);
+
+  if (arrivedAt === undefined) {
+    return null;
+  }
+
+  return {
+    stopIndex,
+    arrivedAt,
+    action,
+  };
+}
+
+function normalizeArrivedAt(value: unknown): string | null | undefined {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return undefined;
+  }
+
+  const timestamp = Date.parse(value);
+
+  if (!Number.isFinite(timestamp)) {
+    return undefined;
+  }
+
+  return new Date(timestamp).toISOString();
+}
+
 function isAcceptableAccuracy(
   accuracyM: number | null | undefined,
   reason: UploadReason
@@ -587,4 +759,8 @@ function isValidIsoDate(value: string): boolean {
   }
 
   return Number.isFinite(Date.parse(value));
+}
+
+function toRadians(degrees: number): number {
+  return degrees * DEGREES_TO_RADIANS;
 }

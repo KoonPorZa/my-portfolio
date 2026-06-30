@@ -14,6 +14,8 @@ import type {
   SessionAudit,
   SessionEndAction,
   ShareSession,
+  StopArrival,
+  StopArrivalSource,
   TrackerMode,
   UploadReason,
 } from "./trip-gps.types";
@@ -28,10 +30,23 @@ export interface TripGpsRepo {
     token: string,
     sessionId: string
   ): Promise<ShareSession | null>;
+  findOwnerSessionByTokenOnly(token: string): Promise<ShareSession | null>;
   findViewerSessionByToken(token: string): Promise<ShareSession | null>;
   getLatestLocation(sessionId: string): Promise<LocationLatest | null>;
+  getStopArrivals(sessionId: string): Promise<StopArrival[]>;
   recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null>;
   recordLocation(point: LocationStorePoint): Promise<LocationLatest>;
+  recordAutoStopArrival(input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  }): Promise<void>;
+  upsertManualStopArrival(input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  }): Promise<void>;
+  clearStopArrival(sessionId: string, stopIndex: number): Promise<void>;
   recordUploadSuccess(sessionId: string): Promise<SessionAudit | null>;
   recordViewerAccess(sessionId: string, accessedAt: string): Promise<SessionAudit | null>;
   stopSessionByOwnerToken(
@@ -72,6 +87,13 @@ type TripLocationPointRow = TripLocationLatestRow & {
   seq: number;
 };
 
+type TripStopArrivalRow = {
+  session_id: string;
+  stop_index: number;
+  arrived_at: string;
+  source: StopArrivalSource;
+};
+
 export type TripGpsDatabase = {
   public: {
     Tables: {
@@ -93,6 +115,12 @@ export type TripGpsDatabase = {
         Update: Partial<TripLocationPointRow>;
         Relationships: [];
       };
+      trip_stop_arrivals: {
+        Row: TripStopArrivalRow;
+        Insert: TripStopArrivalRow;
+        Update: Partial<TripStopArrivalRow>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -110,11 +138,16 @@ type LatestInsert =
   TripGpsDatabase["public"]["Tables"]["trip_location_latest"]["Insert"];
 type PointInsert =
   TripGpsDatabase["public"]["Tables"]["trip_location_points"]["Insert"];
+type StopArrivalInsert =
+  TripGpsDatabase["public"]["Tables"]["trip_stop_arrivals"]["Insert"];
+type StopArrivalRow =
+  TripGpsDatabase["public"]["Tables"]["trip_stop_arrivals"]["Row"];
 
 export class InMemoryTripGpsRepo implements TripGpsRepo {
   private readonly sessions = new Map<string, ShareSession>();
   private readonly latest = new Map<string, LocationLatest>();
   private readonly history = new Map<string, LocationStorePoint[]>();
+  private readonly stopArrivals = new Map<string, Map<number, StopArrival>>();
 
   async createShareSession(session: ShareSession): Promise<ShareSession> {
     const stored = { ...session };
@@ -137,12 +170,20 @@ export class InMemoryTripGpsRepo implements TripGpsRepo {
     return session;
   }
 
+  async findOwnerSessionByTokenOnly(token: string): Promise<ShareSession | null> {
+    return this.findSessionByTokenHash(token, "owner_token_hash");
+  }
+
   async findViewerSessionByToken(token: string): Promise<ShareSession | null> {
     return this.findSessionByTokenHash(token, "viewer_token_hash");
   }
 
   async getLatestLocation(sessionId: string): Promise<LocationLatest | null> {
     return this.latest.get(sessionId) ?? null;
+  }
+
+  async getStopArrivals(sessionId: string): Promise<StopArrival[]> {
+    return sortedStopArrivals(this.stopArrivals.get(sessionId));
   }
 
   async recordSessionError(
@@ -194,6 +235,40 @@ export class InMemoryTripGpsRepo implements TripGpsRepo {
     this.history.set(point.sessionId, history);
 
     return latest;
+  }
+
+  async recordAutoStopArrival(input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  }): Promise<void> {
+    const arrivals = this.stopArrivalsForSession(input.sessionId);
+
+    if (arrivals.has(input.stopIndex)) {
+      return;
+    }
+
+    arrivals.set(input.stopIndex, {
+      index: input.stopIndex,
+      arrivedAt: input.arrivedAt,
+      source: "auto",
+    });
+  }
+
+  async upsertManualStopArrival(input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  }): Promise<void> {
+    this.stopArrivalsForSession(input.sessionId).set(input.stopIndex, {
+      index: input.stopIndex,
+      arrivedAt: input.arrivedAt,
+      source: "manual",
+    });
+  }
+
+  async clearStopArrival(sessionId: string, stopIndex: number): Promise<void> {
+    this.stopArrivals.get(sessionId)?.delete(stopIndex);
   }
 
   async recordUploadSuccess(sessionId: string): Promise<SessionAudit | null> {
@@ -282,6 +357,20 @@ export class InMemoryTripGpsRepo implements TripGpsRepo {
 
     return updated;
   }
+
+  private stopArrivalsForSession(sessionId: string): Map<number, StopArrival> {
+    const existing = this.stopArrivals.get(sessionId);
+
+    if (existing) {
+      return existing;
+    }
+
+    const created = new Map<number, StopArrival>();
+
+    this.stopArrivals.set(sessionId, created);
+
+    return created;
+  }
 }
 
 export class SupabaseTripGpsRepo implements TripGpsRepo {
@@ -320,6 +409,10 @@ export class SupabaseTripGpsRepo implements TripGpsRepo {
     return data ? toShareSession(data) : null;
   }
 
+  async findOwnerSessionByTokenOnly(token: string): Promise<ShareSession | null> {
+    return this.findSessionByTokenHash(token, "owner_token_hash");
+  }
+
   async findViewerSessionByToken(token: string): Promise<ShareSession | null> {
     return this.findSessionByTokenHash(token, "viewer_token_hash");
   }
@@ -336,6 +429,20 @@ export class SupabaseTripGpsRepo implements TripGpsRepo {
     }
 
     return data ? toLocationLatest(data) : null;
+  }
+
+  async getStopArrivals(sessionId: string): Promise<StopArrival[]> {
+    const { data, error } = await this.getClient()
+      .from("trip_stop_arrivals")
+      .select()
+      .eq("session_id", sessionId)
+      .order("stop_index", { ascending: true });
+
+    if (error) {
+      throwSupabaseError("get stop arrivals", error);
+    }
+
+    return data.map(toStopArrival);
   }
 
   async recordSessionError(
@@ -373,6 +480,51 @@ export class SupabaseTripGpsRepo implements TripGpsRepo {
     }
 
     return toLocationLatest(data);
+  }
+
+  async recordAutoStopArrival(input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  }): Promise<void> {
+    const { error } = await this.getClient()
+      .from("trip_stop_arrivals")
+      .upsert(toStopArrivalRow(input, "auto"), {
+        onConflict: "session_id,stop_index",
+        ignoreDuplicates: true,
+      });
+
+    if (error) {
+      throwSupabaseError("record auto stop arrival", error);
+    }
+  }
+
+  async upsertManualStopArrival(input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  }): Promise<void> {
+    const { error } = await this.getClient()
+      .from("trip_stop_arrivals")
+      .upsert(toStopArrivalRow(input, "manual"), {
+        onConflict: "session_id,stop_index",
+      });
+
+    if (error) {
+      throwSupabaseError("upsert manual stop arrival", error);
+    }
+  }
+
+  async clearStopArrival(sessionId: string, stopIndex: number): Promise<void> {
+    const { error } = await this.getClient()
+      .from("trip_stop_arrivals")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq("stop_index", stopIndex);
+
+    if (error) {
+      throwSupabaseError("clear stop arrival", error);
+    }
   }
 
   async recordUploadSuccess(sessionId: string): Promise<SessionAudit | null> {
@@ -571,6 +723,30 @@ function toLocationLatest(row: LatestRow): LocationLatest {
   };
 }
 
+function toStopArrival(row: StopArrivalRow): StopArrival {
+  return {
+    index: row.stop_index,
+    arrivedAt: row.arrived_at,
+    source: row.source,
+  };
+}
+
+function toStopArrivalRow(
+  input: {
+    sessionId: string;
+    stopIndex: number;
+    arrivedAt: string;
+  },
+  source: StopArrivalSource
+): StopArrivalInsert {
+  return {
+    session_id: input.sessionId,
+    stop_index: input.stopIndex,
+    arrived_at: input.arrivedAt,
+    source,
+  };
+}
+
 function toShareSession(row: SessionRow): ShareSession {
   return {
     id: row.id,
@@ -593,6 +769,14 @@ function toSessionAudit(session: ShareSession): SessionAudit {
     uploadCount: session.upload_count,
     lastError: session.last_error,
   };
+}
+
+function sortedStopArrivals(
+  arrivals: Map<number, StopArrival> | undefined
+): StopArrival[] {
+  return Array.from(arrivals?.values() ?? []).sort(
+    (a, b) => a.index - b.index
+  );
 }
 
 function endSessionUpdate(

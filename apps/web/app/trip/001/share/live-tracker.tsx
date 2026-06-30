@@ -9,11 +9,15 @@ import { sanitizeCoords } from "@/lib/trip-gps/geo";
 import {
   TRACKER_MODES,
   type LocationPayload,
+  type StopArrival,
   type TrackerMode,
   type UploadReason,
 } from "@/lib/trip-gps/types";
+import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import styles from "./live-tracker.module.css";
 
+const LOCATION_ENDPOINT_PATH = "/api/trips/001/location";
+const PROGRESS_ENDPOINT_PATH = "/api/trips/001/progress";
 const SESSION_START_ENDPOINT_PATH = "/api/trips/001/session/start";
 const SESSION_STOP_ENDPOINT_PATH = "/api/trips/001/session/stop";
 const TICK_MS = 1_000;
@@ -77,6 +81,22 @@ type CreateSessionResponse = {
 type StopSessionResponse = {
   ok: true;
   session: SessionSummary;
+};
+
+type ProgressUpdateInput =
+  | {
+      stopIndex: number;
+      action: "set";
+      arrivedAt: string;
+    }
+  | {
+      stopIndex: number;
+      action: "clear";
+    };
+
+type ProgressResponse = {
+  ok: true;
+  stopArrivals: StopArrival[];
 };
 
 const modeLabels: Record<TrackerMode, string> = {
@@ -288,6 +308,54 @@ async function stopLiveSession(
   return body;
 }
 
+async function fetchViewerStopArrivals(viewerToken: string): Promise<StopArrival[]> {
+  const response = await fetch(`${apiEndpoint(LOCATION_ENDPOINT_PATH)}?t=${encodeURIComponent(viewerToken)}`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const body = await readJson(response);
+
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(body, response.status, "โหลดความคืบหน้าทริปไม่สำเร็จ"));
+  }
+
+  if (!isRecord(body)) {
+    throw new Error("ข้อมูลความคืบหน้าจากเซิร์ฟเวอร์ไม่ถูกต้อง");
+  }
+
+  return coerceStopArrivals(body.stopArrivals);
+}
+
+async function updateTripProgress(
+  ownerToken: string,
+  input: ProgressUpdateInput
+): Promise<ProgressResponse> {
+  const response = await fetch(apiEndpoint(PROGRESS_ENDPOINT_PATH), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${ownerToken}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+  const body = await readJson(response);
+
+  if (!response.ok) {
+    throw new Error(apiErrorMessage(body, response.status, "บันทึกความคืบหน้าทริปไม่สำเร็จ"));
+  }
+
+  if (!isProgressResponseBody(body)) {
+    throw new Error("ข้อมูลความคืบหน้าจากเซิร์ฟเวอร์ไม่ถูกต้อง");
+  }
+
+  return {
+    ok: true,
+    stopArrivals: coerceStopArrivals(body.stopArrivals),
+  };
+}
+
 async function readJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
@@ -320,6 +388,39 @@ function isCreateSessionResponse(value: unknown): value is CreateSessionResponse
 
 function isStopSessionResponse(value: unknown): value is StopSessionResponse {
   return isRecord(value) && value.ok === true && isSessionSummary(value.session);
+}
+
+function isProgressResponseBody(
+  value: unknown
+): value is { ok: true; stopArrivals: unknown[] } {
+  return isRecord(value) && value.ok === true && Array.isArray(value.stopArrivals);
+}
+
+function coerceStopArrivals(value: unknown): StopArrival[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.index !== "number" ||
+      !Number.isInteger(entry.index) ||
+      typeof entry.arrivedAt !== "string" ||
+      !Number.isFinite(Date.parse(entry.arrivedAt)) ||
+      (entry.source !== "auto" && entry.source !== "manual")
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        index: entry.index,
+        arrivedAt: entry.arrivedAt,
+        source: entry.source,
+      },
+    ];
+  });
 }
 
 function isSessionSummary(value: unknown): value is SessionSummary {
@@ -373,6 +474,11 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   const [lastSentAt, setLastSentAt] = useState<string | null>(null);
   const [lastAccuracy, setLastAccuracy] = useState<number | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [stopArrivals, setStopArrivals] = useState<StopArrival[]>([]);
+  const [progressBusyStopIndex, setProgressBusyStopIndex] = useState<number | null>(null);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
+  const [progressError, setProgressError] = useState<string | null>(null);
+  const [progressControlsActive, setProgressControlsActive] = useState(false);
   const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
   const [viewerLink, setViewerLink] = useState("/trip/001/live");
   const [copied, setCopied] = useState(false);
@@ -384,6 +490,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
   const sessionIdRef = useRef<string | null>(null);
   const ownerTokenRef = useRef<string | null>(null);
+  const viewerTokenRef = useRef<string | null>(null);
   const seqRef = useRef(0);
   const modeRef = useRef<TrackerMode>(mode);
   const sharingRef = useRef(isSharing);
@@ -501,6 +608,45 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     };
   }, [releaseWakeLock]);
 
+  const refreshProgressFromViewer = useCallback(async (viewerToken = viewerTokenRef.current) => {
+    if (!viewerToken) {
+      return;
+    }
+
+    try {
+      const arrivals = await fetchViewerStopArrivals(viewerToken);
+
+      setStopArrivals(arrivals);
+      setProgressError(null);
+    } catch (error) {
+      setProgressError(error instanceof Error ? error.message : "โหลดความคืบหน้าทริปไม่สำเร็จ");
+    }
+  }, []);
+
+  const applyProgressUpdate = useCallback(async (input: ProgressUpdateInput) => {
+    const ownerToken = ownerTokenRef.current;
+
+    if (!ownerToken) {
+      setProgressError("ยังไม่มีเซสชันที่แก้เวลาถึงจริงได้");
+      return;
+    }
+
+    setProgressBusyStopIndex(input.stopIndex);
+    setProgressMessage(null);
+    setProgressError(null);
+
+    try {
+      const result = await updateTripProgress(ownerToken, input);
+
+      setStopArrivals(result.stopArrivals);
+      setProgressMessage(input.action === "clear" ? "ล้างเวลาถึงจริงแล้ว" : "บันทึกเวลาถึงจริงแล้ว");
+    } catch (error) {
+      setProgressError(error instanceof Error ? error.message : "บันทึกความคืบหน้าทริปไม่สำเร็จ");
+    } finally {
+      setProgressBusyStopIndex(null);
+    }
+  }, []);
+
   const uploadSnapshot = useCallback(
     async (
       snapshot: PositionSnapshot,
@@ -548,6 +694,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           setUploadStatus("sent");
           setLastError(null);
           setConsecutiveUploadFailures(0);
+          void refreshProgressFromViewer();
           return true;
         }
 
@@ -565,7 +712,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
         return true;
       }
     },
-    []
+    [refreshProgressFromViewer]
   );
 
   const captureAndUpload = useCallback(
@@ -637,6 +784,10 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
     setIsStarting(true);
     setLastError(null);
+    setProgressMessage(null);
+    setProgressError(null);
+    setStopArrivals([]);
+    setProgressControlsActive(false);
     setNextSendAt(null);
     setConsecutiveUploadFailures(0);
     setWasHiddenWhileSharing(false);
@@ -646,6 +797,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       const session = await createLiveSession(code);
 
       ownerTokenRef.current = session.ownerToken;
+      viewerTokenRef.current = session.viewerToken;
       sessionIdRef.current = session.session.id;
       seqRef.current = 0;
       setViewerLink(resolveViewerLink(session.viewerLink));
@@ -657,8 +809,10 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       if (!captured) {
         await stopLiveSession(session.ownerToken, session.session.id, "revoke").catch(() => undefined);
         ownerTokenRef.current = null;
+        viewerTokenRef.current = null;
         sessionIdRef.current = null;
         setSessionExpiresAt(null);
+        setProgressControlsActive(false);
         setViewerLink(
           typeof window === "undefined" ? "/trip/001/live" : buildViewerLink(window.location.origin)
         );
@@ -666,18 +820,22 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       }
 
       setIsSharing(true);
+      setProgressControlsActive(true);
       setNow(Date.now());
       setNextSendAt(Date.now() + intervalForMode(modeRef.current));
+      void refreshProgressFromViewer(session.viewerToken);
       void requestWakeLock();
     } catch (error) {
       ownerTokenRef.current = null;
+      viewerTokenRef.current = null;
       sessionIdRef.current = null;
       setSessionExpiresAt(null);
+      setProgressControlsActive(false);
       setLastError(error instanceof Error ? error.message : "เริ่มแชร์ GPS สดไม่สำเร็จ");
     } finally {
       setIsStarting(false);
     }
-  }, [captureAndUpload, isSharing, isStarting, ownerCode, requestWakeLock]);
+  }, [captureAndUpload, isSharing, isStarting, ownerCode, refreshProgressFromViewer, requestWakeLock]);
 
   const handleManualPing = useCallback(
     async (reason: UploadReason = "manual") => {
@@ -695,6 +853,38 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     [captureAndUpload, isSharing]
   );
 
+  const handleProgressSetNow = useCallback(
+    (stopIndex: number) => {
+      void applyProgressUpdate({
+        stopIndex,
+        action: "set",
+        arrivedAt: new Date().toISOString(),
+      });
+    },
+    [applyProgressUpdate]
+  );
+
+  const handleProgressSetTime = useCallback(
+    (stopIndex: number, arrivedAt: string) => {
+      void applyProgressUpdate({
+        stopIndex,
+        action: "set",
+        arrivedAt,
+      });
+    },
+    [applyProgressUpdate]
+  );
+
+  const handleProgressClear = useCallback(
+    (stopIndex: number) => {
+      void applyProgressUpdate({
+        stopIndex,
+        action: "clear",
+      });
+    },
+    [applyProgressUpdate]
+  );
+
   const handleStop = useCallback(async () => {
     if (!isSharing || isStopping) {
       return;
@@ -705,6 +895,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
     setIsSharing(false);
     setIsStopping(true);
+    setProgressControlsActive(false);
     setNextSendAt(null);
 
     if (watchIdRef.current !== null && "geolocation" in navigator) {
@@ -737,6 +928,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     try {
       await stopLiveSession(ownerToken, sessionId, "stop");
       ownerTokenRef.current = null;
+      viewerTokenRef.current = null;
       sessionIdRef.current = null;
       setSessionExpiresAt(null);
     } catch (error) {
@@ -796,6 +988,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     isSharing && (isHidden || wasHiddenWhileSharing || wakeLockStatus !== "active");
   const hasRepeatedUploadFailures =
     consecutiveUploadFailures >= REPEATED_UPLOAD_FAILURE_COUNT;
+  const canEditProgress = progressControlsActive && isSharing;
 
   const statusItems = useMemo(
     () => [
@@ -841,156 +1034,171 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
   }
 
   return (
-    <section className={styles.tracker} aria-labelledby="live-tracker-title">
-      <div className={styles.trackerTop}>
-        <div>
-          <p className={styles.eyebrow}>ตำแหน่งสด</p>
-          <h2 id="live-tracker-title">แผงแชร์ GPS</h2>
-        </div>
-        <span className={cx(styles.liveBadge, isSharing ? styles.liveBadgeOn : styles.liveBadgeOff)}>
-          {isSharing ? "สด" : "ปิด"}
-        </span>
-      </div>
-
-      <p className={styles.lead}>
-        เริ่มส่งจากปุ่มนี้เท่านั้น ก่อนกดเริ่มแชร์ ระบบจะไม่อ่าน GPS และไม่อัปโหลดอะไร
-      </p>
-
-      <div className={styles.preflight} aria-label="เช็กลิสต์ก่อนเริ่ม">
-        <span className={styles.preflightTag}>ก่อนเริ่ม</span>
-        <ul>
-          <li>เปิด GPS / บริการตำแหน่งในมือถือ</li>
-          <li className={secureContext === false ? styles.alertItem : undefined}>เปิดหน้านี้ผ่าน HTTPS</li>
-          <li>พกพาวเวอร์แบงก์และสายชาร์จ</li>
-          <li>ถ้าหน้าจอล็อกหรือซ่อนแท็บ เบราว์เซอร์อาจหยุดส่งชั่วคราว</li>
-        </ul>
-      </div>
-
-      <label className={styles.codeBox} htmlFor="trip-gps-owner-code">
-        <span className={styles.viewerLabel}>โค้ดแชร์สด</span>
-        <input
-          id="trip-gps-owner-code"
-          name="trip-gps-owner-code"
-          type="password"
-          value={ownerCode}
-          autoComplete="off"
-          inputMode="text"
-          placeholder="โค้ดเจ้าของจากเซิร์ฟเวอร์"
-          disabled={isSharing || isBusy}
-          onChange={(event) => setOwnerCode(event.target.value)}
-        />
-        <span>ต้องใส่ก่อนเริ่ม เพราะหน้าทริปนี้เป็นสาธารณะ</span>
-      </label>
-
-      <div className={styles.controls} aria-label="ปุ่มควบคุมตำแหน่งสด">
-        <button
-          className={styles.primaryAction}
-          type="button"
-          onClick={() => void handleStart()}
-          disabled={isSharing || isBusy || permission === "unsupported" || !canStart}
-        >
-          {isStarting ? "กำลังเริ่ม..." : "เริ่มแชร์"}
-        </button>
-        <button
-          className={styles.stopAction}
-          type="button"
-          onClick={() => void handleStop()}
-          disabled={!isSharing || isStopping}
-        >
-          {isStopping ? "กำลังหยุด..." : "หยุดแชร์"}
-        </button>
-        <button
-          className={styles.secondaryAction}
-          type="button"
-          onClick={() => void handleManualPing()}
-          disabled={!isSharing || isBusy}
-        >
-          ส่งจุดเอง
-        </button>
-      </div>
-
-      <div className={styles.modeShortcuts} aria-label="ทางลัดรอบส่ง GPS">
-        {modeShortcuts.map((shortcut) => (
-          <button
-            key={shortcut.mode}
-            className={cx(styles.modeAction, mode === shortcut.mode && styles.modeActionOn)}
-            type="button"
-            aria-pressed={mode === shortcut.mode}
-            onClick={() => handleModeSelect(shortcut.mode)}
-          >
-            {shortcut.label}
-          </button>
-        ))}
-      </div>
-
-      <dl className={styles.statusGrid}>
-        {statusItems.map((item) => (
-          <div key={item.label} className={styles.statusCell}>
-            <dt>{item.label}</dt>
-            <dd className={styles[item.tone]}>{item.value}</dd>
+    <>
+      <section className={styles.tracker} aria-labelledby="live-tracker-title">
+        <div className={styles.trackerTop}>
+          <div>
+            <p className={styles.eyebrow}>ตำแหน่งสด</p>
+            <h2 id="live-tracker-title">แผงแชร์ GPS</h2>
           </div>
-        ))}
-      </dl>
-
-      <div className={styles.viewerBox}>
-        <div>
-          <span className={styles.viewerLabel}>ลิงก์ผู้ชม</span>
-          <code>{viewerLink}</code>
-          <p>{hasTokenedViewerLink ? "ส่งลิงก์นี้ให้ผู้ชม" : "เริ่มเซสชันเพื่อออกโทเคนผู้ชม"}</p>
+          <span className={cx(styles.liveBadge, isSharing ? styles.liveBadgeOn : styles.liveBadgeOff)}>
+            {isSharing ? "สด" : "ปิด"}
+          </span>
         </div>
-        <button
-          className={styles.copyButton}
-          type="button"
-          onClick={() => void handleCopyViewerLink()}
-          disabled={!hasTokenedViewerLink}
-        >
-          {copied ? "คัดลอกแล้ว" : "คัดลอก"}
-        </button>
-      </div>
 
-      {permission === "denied" ? (
-        <div className={styles.warning} role="alert">
-          <strong>ปิดสิทธิ์ตำแหน่งอยู่</strong>
-          <p>เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในการตั้งค่าเบราว์เซอร์ แล้วลองใหม่ ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
-          <button className={styles.retryButton} type="button" onClick={handleRetry}>
-            ลองขอสิทธิ์อีกครั้ง
+        <p className={styles.lead}>
+          เริ่มส่งจากปุ่มนี้เท่านั้น ก่อนกดเริ่มแชร์ ระบบจะไม่อ่าน GPS และไม่อัปโหลดอะไร
+        </p>
+
+        <div className={styles.preflight} aria-label="เช็กลิสต์ก่อนเริ่ม">
+          <span className={styles.preflightTag}>ก่อนเริ่ม</span>
+          <ul>
+            <li>เปิด GPS / บริการตำแหน่งในมือถือ</li>
+            <li className={secureContext === false ? styles.alertItem : undefined}>เปิดหน้านี้ผ่าน HTTPS</li>
+            <li>พกพาวเวอร์แบงก์และสายชาร์จ</li>
+            <li>ถ้าหน้าจอล็อกหรือซ่อนแท็บ เบราว์เซอร์อาจหยุดส่งชั่วคราว</li>
+          </ul>
+        </div>
+
+        <label className={styles.codeBox} htmlFor="trip-gps-owner-code">
+          <span className={styles.viewerLabel}>โค้ดแชร์สด</span>
+          <input
+            id="trip-gps-owner-code"
+            name="trip-gps-owner-code"
+            type="password"
+            value={ownerCode}
+            autoComplete="off"
+            inputMode="text"
+            placeholder="โค้ดเจ้าของจากเซิร์ฟเวอร์"
+            disabled={isSharing || isBusy}
+            onChange={(event) => setOwnerCode(event.target.value)}
+          />
+          <span>ต้องใส่ก่อนเริ่ม เพราะหน้าทริปนี้เป็นสาธารณะ</span>
+        </label>
+
+        <div className={styles.controls} aria-label="ปุ่มควบคุมตำแหน่งสด">
+          <button
+            className={styles.primaryAction}
+            type="button"
+            onClick={() => void handleStart()}
+            disabled={isSharing || isBusy || permission === "unsupported" || !canStart}
+          >
+            {isStarting ? "กำลังเริ่ม..." : "เริ่มแชร์"}
+          </button>
+          <button
+            className={styles.stopAction}
+            type="button"
+            onClick={() => void handleStop()}
+            disabled={!isSharing || isStopping}
+          >
+            {isStopping ? "กำลังหยุด..." : "หยุดแชร์"}
+          </button>
+          <button
+            className={styles.secondaryAction}
+            type="button"
+            onClick={() => void handleManualPing()}
+            disabled={!isSharing || isBusy}
+          >
+            ส่งจุดเอง
           </button>
         </div>
-      ) : null}
 
-      {permission === "unsupported" ? (
-        <div className={styles.warning} role="alert">
-          <strong>เบราว์เซอร์นี้ไม่รองรับ GPS</strong>
-          <p>ใช้เบราว์เซอร์มือถือที่รองรับระบบตำแหน่ง ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+        <div className={styles.modeShortcuts} aria-label="ทางลัดรอบส่ง GPS">
+          {modeShortcuts.map((shortcut) => (
+            <button
+              key={shortcut.mode}
+              className={cx(styles.modeAction, mode === shortcut.mode && styles.modeActionOn)}
+              type="button"
+              aria-pressed={mode === shortcut.mode}
+              onClick={() => handleModeSelect(shortcut.mode)}
+            >
+              {shortcut.label}
+            </button>
+          ))}
         </div>
-      ) : null}
 
-      {hasVisibilityRisk ? (
-        <div className={styles.warning} role="status">
-          <strong>ระวังหน้าจอล็อกหรือแท็บถูกซ่อน</strong>
-          <p>ถ้าหน้าจอดับหรือสลับแอป รอบส่ง GPS อาจหยุดชั่วคราว ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+        <dl className={styles.statusGrid}>
+          {statusItems.map((item) => (
+            <div key={item.label} className={styles.statusCell}>
+              <dt>{item.label}</dt>
+              <dd className={styles[item.tone]}>{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <div className={styles.viewerBox}>
+          <div>
+            <span className={styles.viewerLabel}>ลิงก์ผู้ชม</span>
+            <code>{viewerLink}</code>
+            <p>{hasTokenedViewerLink ? "ส่งลิงก์นี้ให้ผู้ชม" : "เริ่มเซสชันเพื่อออกโทเคนผู้ชม"}</p>
+          </div>
+          <button
+            className={styles.copyButton}
+            type="button"
+            onClick={() => void handleCopyViewerLink()}
+            disabled={!hasTokenedViewerLink}
+          >
+            {copied ? "คัดลอกแล้ว" : "คัดลอก"}
+          </button>
         </div>
-      ) : null}
 
-      {hasPoorAccuracy ? (
-        <div className={styles.warning} role="status">
-          <strong>ตำแหน่งคร่าว ๆ</strong>
-          <p>ความแม่นยำล่าสุดกว้างกว่า ±{MAX_BAD_ACCURACY_M} ม. ใช้เป็นจุดประมาณเท่านั้น ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
-        </div>
-      ) : null}
+        {permission === "denied" ? (
+          <div className={styles.warning} role="alert">
+            <strong>ปิดสิทธิ์ตำแหน่งอยู่</strong>
+            <p>เปิดสิทธิ์ตำแหน่งให้เว็บนี้ในการตั้งค่าเบราว์เซอร์ แล้วลองใหม่ ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+            <button className={styles.retryButton} type="button" onClick={handleRetry}>
+              ลองขอสิทธิ์อีกครั้ง
+            </button>
+          </div>
+        ) : null}
 
-      {hasRepeatedUploadFailures ? (
-        <div className={styles.warning} role="alert">
-          <strong>ส่งตำแหน่งไม่สำเร็จหลายครั้ง</strong>
-          <p>ระบบเก็บจุดล่าสุดไว้รอส่งซ้ำเมื่อออนไลน์ ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
-        </div>
-      ) : null}
+        {permission === "unsupported" ? (
+          <div className={styles.warning} role="alert">
+            <strong>เบราว์เซอร์นี้ไม่รองรับ GPS</strong>
+            <p>ใช้เบราว์เซอร์มือถือที่รองรับระบบตำแหน่ง ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+          </div>
+        ) : null}
 
-      {lastError ? (
-        <p className={styles.errorLine} role="status">
-          {lastError}
-        </p>
-      ) : null}
-    </section>
+        {hasVisibilityRisk ? (
+          <div className={styles.warning} role="status">
+            <strong>ระวังหน้าจอล็อกหรือแท็บถูกซ่อน</strong>
+            <p>ถ้าหน้าจอดับหรือสลับแอป รอบส่ง GPS อาจหยุดชั่วคราว ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+          </div>
+        ) : null}
+
+        {hasPoorAccuracy ? (
+          <div className={styles.warning} role="status">
+            <strong>ตำแหน่งคร่าว ๆ</strong>
+            <p>ความแม่นยำล่าสุดกว้างกว่า ±{MAX_BAD_ACCURACY_M} ม. ใช้เป็นจุดประมาณเท่านั้น ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+          </div>
+        ) : null}
+
+        {hasRepeatedUploadFailures ? (
+          <div className={styles.warning} role="alert">
+            <strong>ส่งตำแหน่งไม่สำเร็จหลายครั้ง</strong>
+            <p>ระบบเก็บจุดล่าสุดไว้รอส่งซ้ำเมื่อออนไลน์ ผู้ชมยังเห็นตำแหน่งล่าสุดที่ส่งสำเร็จอยู่</p>
+          </div>
+        ) : null}
+
+        {lastError ? (
+          <p className={styles.errorLine} role="status">
+            {lastError}
+          </p>
+        ) : null}
+      </section>
+
+      <TripProgressTimeline
+        arrivals={stopArrivals}
+        controls={{
+          active: canEditProgress,
+          busyStopIndex: progressBusyStopIndex,
+          onSetNow: handleProgressSetNow,
+          onSetTime: handleProgressSetTime,
+          onClear: handleProgressClear,
+        }}
+        statusMessage={progressMessage}
+        errorMessage={progressError}
+      />
+    </>
   );
 }

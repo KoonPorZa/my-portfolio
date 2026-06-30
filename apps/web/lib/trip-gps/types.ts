@@ -5,6 +5,7 @@ export type TrackerMode = (typeof TRACKER_MODES)[number];
 export type UploadReason = "scheduled" | "manual" | "start" | "stop" | "retry";
 
 export type LocationFreshness = "fresh" | "stale" | "offline";
+export type StopArrivalSource = "auto" | "manual";
 
 export type ViewerState =
   | "loading"
@@ -36,6 +37,12 @@ export type LocationLatest = {
   reason?: UploadReason;
   clientTs: string;
   serverTs: string;
+};
+
+export type StopArrival = {
+  index: number;
+  arrivedAt: string;
+  source: StopArrivalSource;
 };
 
 export type ShareSession = {

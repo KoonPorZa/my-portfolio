@@ -5,11 +5,14 @@ import {
   TRACKER_MODES,
   type LocationFreshness,
   type LocationLatest,
+  type StopArrival,
   type TrackerMode,
   type UploadReason,
   type ViewerState,
 } from "@/lib/trip-gps/types";
+import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import { WeatherNow } from "@/components/weather-now";
+import { buildTimedStops } from "@/lib/trip-stops";
 import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
 import styles from "./live.module.css";
 
@@ -18,6 +21,7 @@ type ViewerLatestResponse = {
   freshness: LocationFreshness | null;
   viewerState: ViewerState;
   latest: LocationLatest | null;
+  stopArrivals: StopArrival[];
   nextPollMs: number;
   message: string;
 };
@@ -34,14 +38,6 @@ type StateCopy = {
   title: string;
   body: string;
   tone: StateTone;
-};
-
-type RouteStop = {
-  no: string;
-  name: string;
-  place: string;
-  meta: string;
-  cumulativeKm: string;
 };
 
 const LOCATION_ENDPOINT_PATH = "/api/trips/001/location";
@@ -64,6 +60,8 @@ const viewerStates = new Set<ViewerState>([
 const freshnessValues = new Set<LocationFreshness>(["fresh", "stale", "offline"]);
 const trackerModes = new Set<TrackerMode>(TRACKER_MODES);
 const uploadReasons = new Set<UploadReason>(["scheduled", "manual", "start", "stop", "retry"]);
+const routeStops = buildTimedStops();
+const routeTotalKm = Math.round(routeStops.at(-1)?.cumulativeKm ?? 0);
 
 const stateCopy: Record<ViewerState, StateCopy> = {
   loading: {
@@ -109,79 +107,6 @@ const stateCopy: Record<ViewerState, StateCopy> = {
     tone: "redGray",
   },
 };
-
-const routeStops: readonly RouteStop[] = [
-  {
-    no: "01",
-    name: "PTT บ้านเขาแดง / สิงหนคร",
-    place: "เทศบาลเมืองสิงหนคร, สงขลา",
-    meta: "Start · เติมเต็มถัง",
-    cumulativeKm: "~6 กม.",
-  },
-  {
-    no: "02",
-    name: "PTT อ.พระพรหม",
-    place: "นครศรีธรรมราช",
-    meta: "พักเช้า 20 นาที",
-    cumulativeKm: "~164 กม.",
-  },
-  {
-    no: "03",
-    name: "PTT เมืองสุราษฎร์ธานี / วัดประดู่",
-    place: "สุราษฎร์ธานี",
-    meta: "มื้อเช้าจริงจัง 30 นาที",
-    cumulativeKm: "~312 กม.",
-  },
-  {
-    no: "04",
-    name: "ปตท. จิงโจ้ หลังสวน",
-    place: "อ.หลังสวน, ชุมพร",
-    meta: "จุดประเมินความล้า",
-    cumulativeKm: "~431 กม.",
-  },
-  {
-    no: "05",
-    name: "PTT 24/7 บ้านเขาพาง / ท่าแซะ",
-    place: "ชุมพร",
-    meta: "Decision · 24 ชม.",
-    cumulativeKm: "~508 กม.",
-  },
-  {
-    no: "06",
-    name: "PTT ทับสะแก",
-    place: "ประจวบคีรีขันธ์",
-    meta: "พักกลางวัน 30 นาที",
-    cumulativeKm: "~648 กม.",
-  },
-  {
-    no: "07",
-    name: "PTT กุยบุรี",
-    place: "ประจวบคีรีขันธ์",
-    meta: "พักสั้นสำรอง",
-    cumulativeKm: "~723 กม.",
-  },
-  {
-    no: "08",
-    name: "PTT ชะอำ / นายาง",
-    place: "เพชรบุรี",
-    meta: "พักก่อนโซนรถมาก",
-    cumulativeKm: "~823 กม.",
-  },
-  {
-    no: "09",
-    name: "PTT พระราม 2 / ท่าทราย",
-    place: "สมุทรสาคร",
-    meta: "เติมก่อนเข้าเมือง",
-    cumulativeKm: "~940 กม.",
-  },
-  {
-    no: "10",
-    name: "ปตท. สาขารามคำแหง (ขาเข้า)",
-    place: "แขวงหัวหมาก, เขตบางกะปิ",
-    meta: "Finish · จุดนัดพบ",
-    cumulativeKm: "~1,014 กม.",
-  },
-];
 
 export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
   const [viewerState, setViewerState] = useState<ViewerState>("loading");
@@ -282,6 +207,7 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
   }, [fetchLatest, lastCheckedAt, nextDelayMs, viewerState]);
 
   const latest = latestResponse?.latest ?? null;
+  const stopArrivals = latestResponse?.stopArrivals ?? [];
   const descriptor = stateCopy[viewerState];
   const badgeClassName = cx(styles.badge, badgeToneClass(descriptor.tone));
   const latestAgeMs = latest ? ageFromServer(latest.serverTs, nowMs) : null;
@@ -404,6 +330,8 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
           {latest ? <WeatherNow lat={latest.lat} lon={latest.lng} /> : null}
         </div>
 
+        <TripProgressTimeline arrivals={stopArrivals} />
+
         <section className={styles.routePanel} aria-labelledby="route-title">
           <header className={styles.routeHeader}>
             <div>
@@ -413,25 +341,25 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
             <dl className={styles.routeStats}>
               <div>
                 <dt>รวม</dt>
-                <dd>~1,014 กม.</dd>
+                <dd>~{routeTotalKm.toLocaleString("th-TH")} กม.</dd>
               </div>
               <div>
                 <dt>จุดพัก</dt>
-                <dd>10 จุด</dd>
+                <dd>{routeStops.length} จุด</dd>
               </div>
             </dl>
           </header>
 
           <ol className={styles.stopList}>
-            {routeStops.map((stop) => (
-              <li key={stop.no} className={styles.stopItem}>
-                <span className={styles.stopNo}>{stop.no}</span>
+            {routeStops.map((stop, index) => (
+              <li key={stop.name} className={styles.stopItem}>
+                <span className={styles.stopNo}>{String(index + 1).padStart(2, "0")}</span>
                 <div>
                   <h3>{stop.name}</h3>
                   <p>{stop.place}</p>
-                  <span>{stop.meta}</span>
+                  <span>{stop.role}</span>
                 </div>
-                <strong>{stop.cumulativeKm}</strong>
+                <strong>~{Math.round(stop.cumulativeKm)} กม.</strong>
               </li>
             ))}
           </ol>
@@ -561,6 +489,7 @@ function coerceViewerResponse(value: unknown): ViewerLatestResponse | null {
   const freshness = coerceFreshness(value.freshness);
   const viewerState = coerceViewerState(value.viewerState);
   const latest = value.latest === null ? null : coerceLatest(value.latest);
+  const stopArrivals = coerceStopArrivals(value.stopArrivals);
   const nextPollMs = typeof value.nextPollMs === "number" ? clampPoll(value.nextPollMs) : MAX_POLL_MS;
   const message = typeof value.message === "string" ? value.message : "";
 
@@ -573,9 +502,37 @@ function coerceViewerResponse(value: unknown): ViewerLatestResponse | null {
     freshness,
     viewerState,
     latest,
+    stopArrivals,
     nextPollMs,
     message,
   };
+}
+
+function coerceStopArrivals(value: unknown): StopArrival[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.index !== "number" ||
+      !Number.isInteger(entry.index) ||
+      typeof entry.arrivedAt !== "string" ||
+      !Number.isFinite(Date.parse(entry.arrivedAt)) ||
+      (entry.source !== "auto" && entry.source !== "manual")
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        index: entry.index,
+        arrivedAt: entry.arrivedAt,
+        source: entry.source,
+      },
+    ];
+  });
 }
 
 function coerceLatest(value: unknown): LocationLatest | null {

@@ -7,6 +7,8 @@ import {
   CreateSessionResponseSchema,
   ErrorResponseSchema,
   LocationPayloadSchema,
+  ProgressBodySchema,
+  ProgressResponseSchema,
   StartSessionBodySchema,
   StopSessionBodySchema,
   StopSessionResponseSchema,
@@ -35,6 +37,12 @@ type StartSessionBody = {
 type StopSessionBody = {
   sessionId?: string;
   action?: SessionEndAction;
+};
+
+type ProgressBody = {
+  stopIndex: number;
+  arrivedAt?: string | null;
+  action?: "set" | "clear";
 };
 
 const OWNER_RATE_LIMIT = {
@@ -171,6 +179,36 @@ export async function tripGpsRoutes(
         ownerToken: readBearerToken(firstHeader(request.headers.authorization)),
         sessionId: normalizeOptionalString(request.body.sessionId),
         action: request.body.action === "revoke" ? "revoke" : "stop",
+      });
+    }
+  );
+
+  fastify.post<{
+    Params: TripParams;
+    Body: ProgressBody;
+  }>(
+    "/api/trips/:tripId/progress",
+    {
+      config: {
+        rateLimit: OWNER_RATE_LIMIT,
+      },
+      schema: {
+        params: TripParamsSchema,
+        body: ProgressBodySchema,
+        response: {
+          200: ProgressResponseSchema,
+          400: ErrorResponseSchema,
+          401: ErrorResponseSchema,
+          404: ErrorResponseSchema,
+          429: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return options.service.updateProgress({
+        tripId: request.params.tripId,
+        ownerToken: readBearerToken(firstHeader(request.headers.authorization)),
+        body: request.body,
       });
     }
   );

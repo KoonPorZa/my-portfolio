@@ -8,11 +8,14 @@ import {
   OFFLINE_AFTER_MS,
   parseLocationPayload,
   STALE_AFTER_MS,
+  TRIP_001_STOP_COORDS,
 } from "../modules/trip-gps/trip-gps.service";
 import { hashToken, verifyToken } from "../modules/trip-gps/trip-gps.tokens";
 import type {
   CreateSessionResponse,
   LocationPayload,
+  ProgressResponse,
+  ViewerLatestResponse,
 } from "../modules/trip-gps/trip-gps.types";
 
 const OWNER_CODE = "owner-secret";
@@ -156,6 +159,197 @@ describe("Trip GPS Fastify routes", () => {
       lng: 100.2209807,
       accuracyM: 24,
     });
+    expect(body.stopArrivals).toEqual([
+      {
+        index: 8,
+        arrivedAt: new Date(BASE_NOW).toISOString(),
+        source: "auto",
+      },
+    ]);
+  });
+
+  it("auto-stamps a nearby stop once on owner uploads", async () => {
+    let now = BASE_NOW;
+    app = await makeApp(() => now);
+    const session = await startSession(app);
+    const firstArrivalTs = new Date(BASE_NOW).toISOString();
+
+    expect(
+      (
+        await uploadLocation(app, session, "start", 1, stopPoint(0))
+      ).statusCode
+    ).toBe(200);
+
+    let viewerBody = await getViewerLatest(app, session);
+    expect(viewerBody.stopArrivals).toEqual([
+      {
+        index: 0,
+        arrivedAt: firstArrivalTs,
+        source: "auto",
+      },
+    ]);
+
+    now = BASE_NOW + 60_000;
+
+    expect(
+      (
+        await uploadLocation(app, session, "manual", 2, stopPoint(0))
+      ).statusCode
+    ).toBe(200);
+
+    viewerBody = await getViewerLatest(app, session);
+    expect(viewerBody.stopArrivals).toEqual([
+      {
+        index: 0,
+        arrivedAt: firstArrivalTs,
+        source: "auto",
+      },
+    ]);
+  });
+
+  it("lets manual progress set override an auto arrival", async () => {
+    app = await makeApp();
+    const session = await startSession(app);
+    const manualArrivedAt = "2026-06-28T11:15:00.000Z";
+
+    expect(
+      (
+        await uploadLocation(app, session, "start", 1, stopPoint(0))
+      ).statusCode
+    ).toBe(200);
+
+    const progressResponse = await updateProgress(app, session, {
+      stopIndex: 0,
+      arrivedAt: manualArrivedAt,
+      action: "set",
+    });
+
+    expect(progressResponse.statusCode).toBe(200);
+    expect(progressResponse.headers["cache-control"]).toBe("no-store");
+    expect(progressResponse.json<ProgressResponse>()).toEqual({
+      ok: true,
+      stopArrivals: [
+        {
+          index: 0,
+          arrivedAt: manualArrivedAt,
+          source: "manual",
+        },
+      ],
+    });
+  });
+
+  it("clears a stop arrival through the progress endpoint", async () => {
+    app = await makeApp();
+    const session = await startSession(app);
+
+    expect(
+      (
+        await updateProgress(app, session, {
+          stopIndex: 0,
+          arrivedAt: "2026-06-28T11:15:00.000Z",
+          action: "set",
+        })
+      ).statusCode
+    ).toBe(200);
+
+    const clearResponse = await updateProgress(app, session, {
+      stopIndex: 0,
+      action: "clear",
+    });
+
+    expect(clearResponse.statusCode).toBe(200);
+    expect(clearResponse.json<ProgressResponse>()).toEqual({
+      ok: true,
+      stopArrivals: [],
+    });
+  });
+
+  it("does not stamp a stop for an out-of-range upload", async () => {
+    app = await makeApp();
+    const session = await startSession(app);
+
+    expect(
+      (
+        await uploadLocation(app, session, "start", 1, {
+          lat: 0,
+          lng: 0,
+        })
+      ).statusCode
+    ).toBe(200);
+
+    const viewerBody = await getViewerLatest(app, session);
+    expect(viewerBody.stopArrivals).toEqual([]);
+  });
+
+  it("includes stopArrivals in viewer latest responses", async () => {
+    app = await makeApp();
+    const session = await startSession(app);
+    const arrivedAt = "2026-06-28T11:15:00.000Z";
+
+    expect(
+      (
+        await updateProgress(app, session, {
+          stopIndex: 1,
+          arrivedAt,
+          action: "set",
+        })
+      ).statusCode
+    ).toBe(200);
+
+    const viewerBody = await getViewerLatest(app, session);
+    expect(viewerBody).toMatchObject({
+      viewerState: "waiting-first-gps",
+      latest: null,
+      stopArrivals: [
+        {
+          index: 1,
+          arrivedAt,
+          source: "manual",
+        },
+      ],
+    });
+  });
+
+  it("validates progress token, trip id, and stop index range", async () => {
+    app = await makeApp();
+    const session = await startSession(app);
+    const payload = {
+      stopIndex: 0,
+      arrivedAt: "2026-06-28T11:15:00.000Z",
+      action: "set",
+    };
+
+    const invalidTokenResponse = await app.inject({
+      method: "POST",
+      url: "/api/trips/001/progress",
+      headers: {
+        authorization: "Bearer bad-token",
+      },
+      payload,
+    });
+    const missingTripResponse = await app.inject({
+      method: "POST",
+      url: "/api/trips/999/progress",
+      headers: {
+        authorization: `Bearer ${session.ownerToken}`,
+      },
+      payload,
+    });
+    const outOfRangeResponse = await app.inject({
+      method: "POST",
+      url: "/api/trips/001/progress",
+      headers: {
+        authorization: `Bearer ${session.ownerToken}`,
+      },
+      payload: {
+        ...payload,
+        stopIndex: TRIP_001_STOP_COORDS.length,
+      },
+    });
+
+    expect(invalidTokenResponse.statusCode).toBe(401);
+    expect(missingTripResponse.statusCode).toBe(404);
+    expect(outOfRangeResponse.statusCode).toBe(400);
   });
 
   it("returns 401 for missing or invalid viewer tokens and 403 after revoke", async () => {
@@ -296,7 +490,8 @@ async function uploadLocation(
   fastify: FastifyInstance,
   session: CreateSessionResponse,
   reason: LocationPayload["reason"],
-  seq = 1
+  seq = 1,
+  overrides: Partial<LocationPayload> = {}
 ) {
   return fastify.inject({
     method: "POST",
@@ -304,8 +499,57 @@ async function uploadLocation(
     headers: {
       authorization: `Bearer ${session.ownerToken}`,
     },
-    payload: makeLocationPayload(session.session.id, seq, reason),
+    payload: {
+      ...makeLocationPayload(session.session.id, seq, reason),
+      ...overrides,
+    },
   });
+}
+
+async function updateProgress(
+  fastify: FastifyInstance,
+  session: CreateSessionResponse,
+  payload: {
+    stopIndex: number;
+    arrivedAt?: string | null;
+    action?: "set" | "clear";
+  }
+) {
+  return fastify.inject({
+    method: "POST",
+    url: "/api/trips/001/progress",
+    headers: {
+      authorization: `Bearer ${session.ownerToken}`,
+    },
+    payload,
+  });
+}
+
+async function getViewerLatest(
+  fastify: FastifyInstance,
+  session: CreateSessionResponse
+): Promise<ViewerLatestResponse> {
+  const response = await fastify.inject({
+    method: "GET",
+    url: `/api/trips/001/location?t=${encodeURIComponent(session.viewerToken)}`,
+  });
+
+  expect(response.statusCode).toBe(200);
+
+  return response.json<ViewerLatestResponse>();
+}
+
+function stopPoint(index: number): Pick<LocationPayload, "lat" | "lng"> {
+  const coords = TRIP_001_STOP_COORDS[index];
+
+  if (!coords) {
+    throw new Error(`Missing test stop coordinate at index ${index}`);
+  }
+
+  return {
+    lat: coords[0],
+    lng: coords[1],
+  };
 }
 
 function makeLocationPayload(

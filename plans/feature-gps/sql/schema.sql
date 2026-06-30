@@ -83,9 +83,22 @@ create index if not exists trip_location_points_server_ts_idx
 create index if not exists trip_location_points_session_server_ts_idx
   on public.trip_location_points (session_id, server_ts desc);
 
+create table if not exists public.trip_stop_arrivals (
+  session_id text not null
+    references public.trip_share_sessions (id) on delete cascade,
+  stop_index integer not null check (stop_index >= 0),
+  arrived_at timestamptz not null,
+  source text not null check (source in ('auto', 'manual')),
+  primary key (session_id, stop_index)
+);
+
+create index if not exists trip_stop_arrivals_arrived_at_idx
+  on public.trip_stop_arrivals (arrived_at);
+
 alter table public.trip_share_sessions enable row level security;
 alter table public.trip_location_latest enable row level security;
 alter table public.trip_location_points enable row level security;
+alter table public.trip_stop_arrivals enable row level security;
 
 create or replace function public.trip_gps_clear_latest_on_session_end()
 returns trigger

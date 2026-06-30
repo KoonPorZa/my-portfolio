@@ -26,6 +26,15 @@ export const StopSessionBodySchema = Type.Object(
   { additionalProperties: true }
 );
 
+export const ProgressBodySchema = Type.Object(
+  {
+    stopIndex: Type.Integer({ minimum: 0 }),
+    arrivedAt: Type.Optional(NullableString),
+    action: Type.Optional(Type.Union([Type.Literal("set"), Type.Literal("clear")])),
+  },
+  { additionalProperties: true }
+);
+
 export const LocationPayloadSchema = Type.Object(
   {
     sessionId: Type.String({ minLength: 1, maxLength: 128 }),
@@ -80,6 +89,12 @@ const PublicSessionSchema = Type.Object({
   revokedAt: NullableString,
 });
 
+const StopArrivalSchema = Type.Object({
+  index: Type.Number(),
+  arrivedAt: Type.String(),
+  source: Type.Union([Type.Literal("auto"), Type.Literal("manual")]),
+});
+
 export const UploadLocationResponseSchema = Type.Object({
   ok: Type.Literal(true),
   latest: LocationLatestSchema,
@@ -104,6 +119,7 @@ export const ViewerLatestResponseSchema = Type.Object({
     Type.Literal("stopped"),
   ]),
   latest: Type.Union([LocationLatestSchema, Type.Null()]),
+  stopArrivals: Type.Array(StopArrivalSchema),
   audit: Type.Union([SessionAuditSchema, Type.Null()]),
   nextPollMs: Type.Number(),
   message: Type.String(),
@@ -120,6 +136,11 @@ export const CreateSessionResponseSchema = Type.Object({
 export const StopSessionResponseSchema = Type.Object({
   ok: Type.Literal(true),
   session: PublicSessionSchema,
+});
+
+export const ProgressResponseSchema = Type.Object({
+  ok: Type.Literal(true),
+  stopArrivals: Type.Array(StopArrivalSchema),
 });
 
 export const ErrorResponseSchema = Type.Object({

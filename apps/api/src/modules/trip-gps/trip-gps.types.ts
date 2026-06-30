@@ -12,6 +12,7 @@ export type TrackerMode = (typeof TRACKER_MODES)[number];
 export type UploadReason = (typeof UPLOAD_REASONS)[number];
 
 export type LocationFreshness = "fresh" | "stale" | "offline";
+export type StopArrivalSource = "auto" | "manual";
 
 export type ViewerState =
   | "loading"
@@ -43,6 +44,12 @@ export type LocationLatest = {
   reason?: UploadReason;
   clientTs: string;
   serverTs: string;
+};
+
+export type StopArrival = {
+  index: number;
+  arrivedAt: string;
+  source: StopArrivalSource;
 };
 
 export type ShareSession = {
@@ -79,6 +86,7 @@ export type ViewerLatestResponse = {
   freshness: LocationFreshness | null;
   viewerState: ViewerState;
   latest: LocationLatest | null;
+  stopArrivals: StopArrival[];
   audit: SessionAudit | null;
   nextPollMs: number;
   message: string;
@@ -101,6 +109,11 @@ export type CreateSessionResponse = {
 export type StopSessionResponse = {
   ok: true;
   session: PublicSession;
+};
+
+export type ProgressResponse = {
+  ok: true;
+  stopArrivals: StopArrival[];
 };
 
 export type SessionEndAction = "stop" | "revoke";
