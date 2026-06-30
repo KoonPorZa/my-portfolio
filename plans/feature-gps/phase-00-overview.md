@@ -7,6 +7,11 @@
 > Backend update: Phase 11 supersedes the original Next Route Handler API plan with a
 > dedicated Fastify backend. If the HTML plan conflicts with Phase 11, follow Phase 11.
 
+> Workspace note: the repo is now an npm workspace; the Next frontend moved to
+> `apps/web/` (so paths written as `app/...`, `lib/trip-gps/...`, or
+> `components/...` in these phase docs now live under `apps/web/`), and the
+> Fastify backend is in `apps/api/` (Phase 11).
+
 ---
 
 ## What we are building

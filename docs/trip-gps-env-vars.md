@@ -4,6 +4,9 @@
 feature. ค่า secret ต้องตั้งเฉพาะฝั่ง server เท่านั้น และห้ามใส่ไว้ใน
 `NEXT_PUBLIC_*` เว้นแต่ตัวแปรนั้นเป็น public UI flag โดยตรง
 
+Frontend variables start from `apps/web/.env.example`; backend variables start
+from `apps/api/.env.example`.
+
 ## Required server variables
 
 ตัวแปรกลุ่มนี้ใช้เปิด storage จริงและยืนยันสิทธิ์ owner บนฝั่ง server.

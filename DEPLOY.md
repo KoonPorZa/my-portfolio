@@ -1,6 +1,7 @@
 # Deploy → koonporza.com
 
-Static Next.js app. Recommended host: **Vercel** (auto-detects Next.js, free tier, easy custom domain).
+Next.js frontend. Recommended host: **Vercel** (auto-detects Next.js, free
+tier, easy custom domain).
 
 ## 1. Push to GitHub
 
@@ -17,9 +18,25 @@ git push -u origin main
 ## 2. Import on Vercel
 
 1. vercel.com → **Add New… → Project** → import the repo
-2. Framework preset: **Next.js** (auto-detected) — no config needed
-3. Build command `next build`, output handled automatically
-4. **Deploy** → you get a `*.vercel.app` preview URL
+2. Set **Project Settings → Build & Deployment → Root Directory** to `apps/web`
+3. Framework preset: **Next.js** (auto-detected)
+4. Build command: `next build`
+5. Install command: use the default root install so npm workspaces install from
+   the repo root.
+6. Set `NEXT_PUBLIC_TRIP_GPS_API_BASE` to the public Fastify backend URL, for
+   example `https://api.koonporza.com`. Leave it empty only when using
+   same-origin Next fallback routes.
+7. **Deploy** → you get a `*.vercel.app` preview URL
+
+## 2b. Deploy the GPS API
+
+Deploy `apps/api` separately to a Node host such as Railway, Render, or Fly.io.
+Free tiers can cold-start, which is acceptable for the MVP. Do not add a paid
+plan without asking first.
+
+Set backend environment variables in `apps/api/.env` for local runs, or in the
+backend host for production. Start from `apps/api/.env.example`, and include
+`CORS_ORIGINS` with the deployed frontend origin(s).
 
 ## 3. Custom domain koonporza.com
 
@@ -31,12 +48,15 @@ git push -u origin main
 
 ## 4. Before going live
 
-- [ ] Fill real content in `lib/data.ts` (projects, links, bio, email)
+- [ ] Fill real content in `apps/web/lib/data.ts` (projects, links, bio, email)
 - [ ] Replace social `href`s (currently point to bare `github.com` / `x.com`)
-- [ ] Add `public/resume.pdf` (or remove the resume button in `lib/data.ts`)
-- [ ] Add an OG image: `app/opengraph-image.png` (1200×630) for nice link previews
-- [ ] Swap `public/favicon.ico` for your own
+- [ ] Add `apps/web/public/resume.pdf` (or remove the resume button in
+  `apps/web/lib/data.ts`)
+- [ ] Add an OG image: `apps/web/app/opengraph-image.png` (1200×630) for nice
+  link previews
+- [ ] Swap `apps/web/public/favicon.ico` for your own
 
 ## Alt hosts
 
-Cloudflare Pages / Netlify also work (Next.js preset). Vercel is the path of least resistance.
+Cloudflare Pages / Netlify also work (Next.js preset). Vercel is the path of
+least resistance.

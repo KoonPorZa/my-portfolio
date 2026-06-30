@@ -12,8 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Standalone Fastify backend (apps/api) has its own toolchain (Phase 11).
-    "apps/**",
   ]),
 ]);
 
