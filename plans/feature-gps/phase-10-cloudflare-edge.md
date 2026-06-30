@@ -37,9 +37,13 @@ the auth boundary.**
    **not** render on `/trip/001/live` (token in `?t=`). Default OFF. The beacon must never see the viewer token.
 
 ## Tasks — Cloudflare dashboard (owner action; documented here, not code)
-1. **DNS/Proxy/CDN:** set the web hostname's DNS record to **Proxied** in front of Vercel, and set
-   `api.koonporza.com` to **Proxied** in front of the Fastify backend host if that host supports it.
-   Keep verification/TXT records **DNS-only**. SSL/TLS = **Full (Strict)** once the origins are ready.
+1. **DNS/Proxy/CDN:** `koonporza.com` is served directly by the **Cloudflare Worker**
+   (`portfolio-koonporza-web`) via a Custom Domain — attach it in the Worker's
+   Settings → Domains & Routes → Add → Custom Domain (no manual A/CNAME needed;
+   Cloudflare handles the orange-cloud proxy automatically). CDN/edge caching is
+   inherent because the Worker runs on Cloudflare's edge. Set `api.koonporza.com`
+   to **Proxied** in front of the Fastify backend host. Keep verification/TXT records
+   **DNS-only**. SSL/TLS = **Full (Strict)** once the origins are ready.
    Do **not** cache `/api/trips/001/*` or `/trip/001/live*`; cache only safe static assets.
 2. **WAF + Rate limiting:** scope rules to `/api/trips/001/location*` + the session endpoint (+ optional
    `/trip/001/live*`). Owner POST: challenge/block above ~10–20 req/min/IP. Viewer GET: keep the limit
@@ -58,5 +62,5 @@ the auth boundary.**
       WAF/rate-limit doesn't block normal viewer polling but challenges abnormal bursts.
 
 ## Out of scope
-- Cloudflare Workers / D1 / Durable Objects / R2 / KV — the MVP stays frontend host + Fastify backend + Supabase.
+- Hand-written Worker logic / D1 / Durable Objects / R2 / KV for the GPS feature — the MVP stays Next-on-Workers (OpenNext, no custom edge code) + Fastify backend + Supabase. (The web app does run on Cloudflare Workers via OpenNext, but that is the host runtime, not GPS feature code.)
 - Wrangler/Terraform automation of the dashboard config (manual now; automate later if needed).

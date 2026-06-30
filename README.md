@@ -54,4 +54,4 @@ apps/web/lib/data.ts     ← all editable content
 
 ## Deploy
 
-See `DEPLOY.md` — push to GitHub, import on Vercel, point `koonporza.com` at it.
+See `DEPLOY.md` — push to GitHub, deploy `apps/web` to **Cloudflare Workers**, point `koonporza.com` at it.

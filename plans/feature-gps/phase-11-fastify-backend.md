@@ -151,7 +151,7 @@ The repository layer must upsert `trip_location_latest` and append
 
 Deploy the backend separately from the frontend.
 
-- Frontend: Vercel or the current selected web host.
+- Frontend: **Cloudflare Workers** (via `@opennextjs/cloudflare`) — see `DEPLOY.md`.
 - Backend: Railway first, Render if a more predictable always-on service is
   preferred, or Fly.io if Docker and regional control are worth the extra ops.
 - Database: Supabase Postgres.
