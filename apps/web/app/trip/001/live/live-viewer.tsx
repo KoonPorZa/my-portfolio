@@ -9,6 +9,7 @@ import {
   type UploadReason,
   type ViewerState,
 } from "@/lib/trip-gps/types";
+import { WeatherNow } from "@/components/weather-now";
 import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
 import styles from "./live.module.css";
 
@@ -339,65 +340,69 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
           {errorMessage ? <p className={styles.errorLine}>{errorMessage}</p> : null}
         </section>
 
-        <section className={styles.pointPanel} aria-labelledby="latest-point-title">
-          <div className={styles.panelHeader}>
-            <div>
-              <p className={styles.eyebrow}>Latest point</p>
-              <h2 id="latest-point-title">{latestTitle}</h2>
+        <div className={styles.locationGrid}>
+          <section className={styles.pointPanel} aria-labelledby="latest-point-title">
+            <div className={styles.panelHeader}>
+              <div>
+                <p className={styles.eyebrow}>Latest point</p>
+                <h2 id="latest-point-title">{latestTitle}</h2>
+              </div>
+              {mapsHref ? (
+                <a className={styles.mapButton} href={mapsHref} target="_blank" rel="noreferrer">
+                  เปิดใน Google Maps
+                </a>
+              ) : (
+                <span className={styles.mapButtonDisabled}>ยังไม่มีพิกัด</span>
+              )}
             </div>
-            {mapsHref ? (
-              <a className={styles.mapButton} href={mapsHref} target="_blank" rel="noreferrer">
-                เปิดใน Google Maps
-              </a>
-            ) : (
-              <span className={styles.mapButtonDisabled}>ยังไม่มีพิกัด</span>
-            )}
-          </div>
 
-          {latest ? (
-            <>
-              <dl className={styles.pointGrid}>
-                <div className={styles.pointWide}>
-                  <dt>พิกัดล่าสุด</dt>
-                  <dd>
-                    {latest.lat.toFixed(6)}, {latest.lng.toFixed(6)}
-                  </dd>
-                </div>
-                <div>
-                  <dt>อายุตำแหน่ง</dt>
-                  <dd>{latestAgeMs === null ? "ไม่ทราบ" : formatAge(latestAgeMs)}</dd>
-                </div>
-                <div>
-                  <dt>เวลาเครื่องผู้ขี่</dt>
-                  <dd>{formatTimestamp(latest.clientTs)}</dd>
-                </div>
-                <div>
-                  <dt>เวลารับเข้าระบบ</dt>
-                  <dd>{formatTimestamp(latest.serverTs)}</dd>
-                </div>
-                <div>
-                  <dt>ความแม่นยำ</dt>
-                  <dd>±{Math.round(latest.accuracyM)} ม.</dd>
-                </div>
-                {typeof latest.speedMps === "number" ? (
-                  <div>
-                    <dt>ความเร็วโดยประมาณ</dt>
-                    <dd>{Math.round(latest.speedMps * 3.6)} กม./ชม.</dd>
+            {latest ? (
+              <>
+                <dl className={styles.pointGrid}>
+                  <div className={styles.pointWide}>
+                    <dt>พิกัดล่าสุด</dt>
+                    <dd>
+                      {latest.lat.toFixed(6)}, {latest.lng.toFixed(6)}
+                    </dd>
                   </div>
-                ) : null}
-              </dl>
+                  <div>
+                    <dt>อายุตำแหน่ง</dt>
+                    <dd>{latestAgeMs === null ? "ไม่ทราบ" : formatAge(latestAgeMs)}</dd>
+                  </div>
+                  <div>
+                    <dt>เวลาเครื่องผู้ขี่</dt>
+                    <dd>{formatTimestamp(latest.clientTs)}</dd>
+                  </div>
+                  <div>
+                    <dt>เวลารับเข้าระบบ</dt>
+                    <dd>{formatTimestamp(latest.serverTs)}</dd>
+                  </div>
+                  <div>
+                    <dt>ความแม่นยำ</dt>
+                    <dd>±{Math.round(latest.accuracyM)} ม.</dd>
+                  </div>
+                  {typeof latest.speedMps === "number" ? (
+                    <div>
+                      <dt>ความเร็วโดยประมาณ</dt>
+                      <dd>{Math.round(latest.speedMps * 3.6)} กม./ชม.</dd>
+                    </div>
+                  ) : null}
+                </dl>
 
-              {(viewerState === "stale" || viewerState === "offline") ? (
-                <p className={styles.lastKnownWarning}>จุดนี้คือ last known location เท่านั้น อย่าใช้ตีความว่าเป็นตำแหน่งสด</p>
-              ) : null}
-            </>
-          ) : (
-            <div className={styles.emptyPoint}>
-              <p>ยังไม่มีพิกัดให้แสดง</p>
-              <span>เมื่อ API ได้รับ GPS จุดแรก หน้านี้จะแสดงพิกัด เวลา อายุ ความแม่นยำ และลิงก์ Google Maps</span>
-            </div>
-          )}
-        </section>
+                {viewerState === "stale" || viewerState === "offline" ? (
+                  <p className={styles.lastKnownWarning}>จุดนี้คือ last known location เท่านั้น อย่าใช้ตีความว่าเป็นตำแหน่งสด</p>
+                ) : null}
+              </>
+            ) : (
+              <div className={styles.emptyPoint}>
+                <p>ยังไม่มีพิกัดให้แสดง</p>
+                <span>เมื่อ API ได้รับ GPS จุดแรก หน้านี้จะแสดงพิกัด เวลา อายุ ความแม่นยำ และลิงก์ Google Maps</span>
+              </div>
+            )}
+          </section>
+
+          {latest ? <WeatherNow lat={latest.lat} lon={latest.lng} /> : null}
+        </div>
 
         <section className={styles.routePanel} aria-labelledby="route-title">
           <header className={styles.routeHeader}>
