@@ -3,6 +3,12 @@
 **Priority:** P1 · **Branch:** `feat/gps` · **Depends on:** Phase 4
 **Read first:** `phase-00-overview.md` (tables, guardrails, cost guard)
 
+> **Superseded for the Fastify backend track:** If the project is using the
+> dedicated Fastify service, implement Supabase storage inside
+> `apps/api/src/modules/trip-gps/` as described in
+> `phase-11-fastify-backend.md`. Keep this file only as historical context for
+> the storage contract and retention requirements.
+
 ## Goal
 Replace the mock store with Supabase Postgres as the real `LocationStore`, server-side only,
 staying within the free tier.

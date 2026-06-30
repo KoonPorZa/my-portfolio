@@ -1,6 +1,6 @@
 # Phase 7 — Token lifecycle & security
 
-**Priority:** P1 · **Branch:** `feat/gps` · **Depends on:** Phase 4, Phase 5
+**Priority:** P1 · **Branch:** `feat/gps` · **Depends on:** Phase 11
 **Read first:** `phase-00-overview.md` (security model, guardrails)
 
 ## Goal
@@ -9,8 +9,8 @@ Make sharing safe: only people with a link can view, the rider can stop instantl
 server-side owner code (the removed `1942` password is never the boundary).
 
 ## Files
-- **create** `lib/trip-gps/token.ts` (generate/hash/verify)
-- **create/extend** `app/api/trips/001/session/route.ts` (create / stop / revoke)
+- **create** `apps/api/src/modules/trip-gps/trip-gps.tokens.ts` (generate/hash/verify)
+- **create/extend** Fastify session routes in `apps/api/src/modules/trip-gps/trip-gps.routes.ts` (create / stop / revoke)
 - **modify** the tracker panel (Phase 2) to start a session via a server-side live-share code
 
 ## Tasks

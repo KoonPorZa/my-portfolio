@@ -1,0 +1,128 @@
+import { Type } from "@sinclair/typebox";
+
+const NullableString = Type.Union([Type.String(), Type.Null()]);
+const NullableNumber = Type.Union([Type.Number(), Type.Null()]);
+
+export const TripParamsSchema = Type.Object({
+  tripId: Type.String(),
+});
+
+export const ViewerQuerySchema = Type.Object({
+  t: Type.Optional(Type.String()),
+});
+
+export const StartSessionBodySchema = Type.Object(
+  {
+    code: Type.Optional(Type.String()),
+  },
+  { additionalProperties: true }
+);
+
+export const StopSessionBodySchema = Type.Object(
+  {
+    sessionId: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+    action: Type.Optional(Type.Union([Type.Literal("stop"), Type.Literal("revoke")])),
+  },
+  { additionalProperties: true }
+);
+
+export const LocationPayloadSchema = Type.Object(
+  {
+    sessionId: Type.String({ minLength: 1, maxLength: 128 }),
+    seq: Type.Integer({ minimum: 0 }),
+    lat: Type.Number(),
+    lng: Type.Number(),
+    accuracyM: Type.Number(),
+    speedMps: Type.Optional(NullableNumber),
+    headingDeg: Type.Optional(NullableNumber),
+    clientTs: Type.String({ minLength: 1 }),
+    mode: Type.Union([
+      Type.Literal("active"),
+      Type.Literal("saver"),
+      Type.Literal("rest"),
+      Type.Literal("city"),
+    ]),
+    reason: Type.Union([
+      Type.Literal("scheduled"),
+      Type.Literal("manual"),
+      Type.Literal("start"),
+      Type.Literal("stop"),
+      Type.Literal("retry"),
+    ]),
+  },
+  { additionalProperties: true }
+);
+
+const SessionAuditSchema = Type.Object({
+  lastViewerAccessAt: NullableString,
+  uploadCount: Type.Number(),
+  lastError: NullableString,
+});
+
+const LocationLatestSchema = Type.Object({
+  lat: Type.Number(),
+  lng: Type.Number(),
+  accuracyM: Type.Number(),
+  speedMps: Type.Optional(NullableNumber),
+  headingDeg: Type.Optional(NullableNumber),
+  mode: Type.Optional(Type.String()),
+  reason: Type.Optional(Type.String()),
+  clientTs: Type.String(),
+  serverTs: Type.String(),
+});
+
+const PublicSessionSchema = Type.Object({
+  id: Type.String(),
+  tripId: Type.String(),
+  active: Type.Boolean(),
+  expiresAt: Type.String(),
+  stoppedAt: NullableString,
+  revokedAt: NullableString,
+});
+
+export const UploadLocationResponseSchema = Type.Object({
+  ok: Type.Literal(true),
+  latest: LocationLatestSchema,
+  audit: Type.Union([SessionAuditSchema, Type.Null()]),
+});
+
+export const ViewerLatestResponseSchema = Type.Object({
+  status: Type.Union([Type.Literal("active"), Type.Literal("stopped")]),
+  freshness: Type.Union([
+    Type.Literal("fresh"),
+    Type.Literal("stale"),
+    Type.Literal("offline"),
+    Type.Null(),
+  ]),
+  viewerState: Type.Union([
+    Type.Literal("loading"),
+    Type.Literal("invalid/expired"),
+    Type.Literal("waiting-first-gps"),
+    Type.Literal("fresh"),
+    Type.Literal("stale"),
+    Type.Literal("offline"),
+    Type.Literal("stopped"),
+  ]),
+  latest: Type.Union([LocationLatestSchema, Type.Null()]),
+  audit: Type.Union([SessionAuditSchema, Type.Null()]),
+  nextPollMs: Type.Number(),
+  message: Type.String(),
+});
+
+export const CreateSessionResponseSchema = Type.Object({
+  ok: Type.Literal(true),
+  session: PublicSessionSchema,
+  ownerToken: Type.String(),
+  viewerToken: Type.String(),
+  viewerLink: Type.String(),
+});
+
+export const StopSessionResponseSchema = Type.Object({
+  ok: Type.Literal(true),
+  session: PublicSessionSchema,
+});
+
+export const ErrorResponseSchema = Type.Object({
+  error: Type.String(),
+  message: Type.String(),
+});

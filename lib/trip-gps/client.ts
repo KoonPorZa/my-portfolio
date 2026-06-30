@@ -1,6 +1,7 @@
 import type { LocationPayload } from "./types";
+import { tripGpsApiBase } from "./api-base";
 
-const LOCATION_ENDPOINT = "/api/trips/001/location";
+const LOCATION_ENDPOINT_PATH = "/api/trips/001/location";
 const LOCATION_UPLOAD_QUEUE_STORAGE_KEY = "trip-gps:location-upload-queue:v1";
 const LOCATION_UPLOAD_QUEUE_MAX_POINTS = 3;
 
@@ -71,7 +72,7 @@ export async function uploadLocation(
   options: UploadLocationOptions
 ): Promise<UploadLocationResult> {
   const token = options.token.trim();
-  const endpoint = options.endpoint ?? LOCATION_ENDPOINT;
+  const endpoint = options.endpoint ?? locationEndpoint();
   const queue = options.queue ?? getDefaultLocationUploadQueue();
   const managedQueue = asManagedQueue(queue);
 
@@ -145,7 +146,7 @@ class BrowserLocationUploadQueue implements ManagedLocationUploadQueue {
     }
 
     const token = options.token.trim();
-    const endpoint = options.endpoint ?? LOCATION_ENDPOINT;
+    const endpoint = options.endpoint ?? locationEndpoint();
 
     if (!token || !isHttpsOrRelative(endpoint)) {
       return;
@@ -357,6 +358,12 @@ function sortQueuedPoints(points: LocationPayload[]): LocationPayload[] {
 
     return Date.parse(a.clientTs) - Date.parse(b.clientTs);
   });
+}
+
+function locationEndpoint(): string {
+  const base = tripGpsApiBase();
+
+  return base ? `${base}${LOCATION_ENDPOINT_PATH}` : LOCATION_ENDPOINT_PATH;
 }
 
 function isRetryableStatus(status: number): boolean {

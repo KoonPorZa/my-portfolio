@@ -9,6 +9,7 @@ import {
   type UploadReason,
   type ViewerState,
 } from "@/lib/trip-gps/types";
+import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
 import styles from "./live.module.css";
 
 type ViewerLatestResponse = {
@@ -42,7 +43,7 @@ type RouteStop = {
   cumulativeKm: string;
 };
 
-const LOCATION_ENDPOINT = "/api/trips/001/location";
+const LOCATION_ENDPOINT_PATH = "/api/trips/001/location";
 const MIN_POLL_MS = 30_000;
 const MAX_POLL_MS = 60_000;
 const SECOND_MS = 1_000;
@@ -199,7 +200,7 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
     setIsRefreshing(true);
 
     try {
-      const response = await fetch(`${LOCATION_ENDPOINT}?t=${encodeURIComponent(token)}`, {
+      const response = await fetch(`${locationEndpoint()}?t=${encodeURIComponent(token)}`, {
         method: "GET",
         headers: { Accept: "application/json" },
         cache: "no-store",
@@ -466,6 +467,12 @@ function clampPoll(ms: number): number {
 
 function googleMapsLink(lat: number, lng: number): string {
   return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+}
+
+function locationEndpoint(): string {
+  const base = tripGpsApiBase();
+
+  return base ? `${base}${LOCATION_ENDPOINT_PATH}` : LOCATION_ENDPOINT_PATH;
 }
 
 function ageFromServer(serverTs: string, nowMs: number): number | null {

@@ -3,6 +3,11 @@
 **Priority:** P1 · **Branch:** `feat/gps` · **Depends on:** Phase 3
 **Read first:** `phase-00-overview.md` (data contract, guardrails)
 
+> **Superseded for the Fastify backend track:** If the project is using the
+> dedicated Fastify service, implement `phase-11-fastify-backend.md` instead of
+> creating these Next.js Route Handlers. Keep this file only as historical
+> context for the API contract and behavior.
+
 ## Goal
 Create the server boundary in the App Router before wiring a real database — owner uploads
 in, viewer reads latest out — using a mock store first if DB credentials aren't ready.

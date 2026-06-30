@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { MAX_BAD_ACCURACY_M, intervalForMode } from "@/lib/trip-gps/cadence";
+import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
 import { uploadLocation } from "@/lib/trip-gps/client";
 import { sanitizeCoords } from "@/lib/trip-gps/geo";
 import {
@@ -13,7 +14,8 @@ import {
 } from "@/lib/trip-gps/types";
 import styles from "./live-tracker.module.css";
 
-const SESSION_ENDPOINT = "/api/trips/001/session";
+const SESSION_START_ENDPOINT_PATH = "/api/trips/001/session/start";
+const SESSION_STOP_ENDPOINT_PATH = "/api/trips/001/session/stop";
 const TICK_MS = 1_000;
 const SECONDS_PER_MINUTE = 60;
 const COPY_RESET_MS = 1_800;
@@ -233,8 +235,12 @@ function buildViewerLink(origin: string) {
   return `${origin}/trip/001/live`;
 }
 
+function resolveViewerLink(viewerLink: string): string {
+  return new URL(viewerLink, window.location.origin).toString();
+}
+
 async function createLiveSession(code: string): Promise<CreateSessionResponse> {
-  const response = await fetch(SESSION_ENDPOINT, {
+  const response = await fetch(apiEndpoint(SESSION_START_ENDPOINT_PATH), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -260,8 +266,8 @@ async function stopLiveSession(
   sessionId: string,
   action: "stop" | "revoke"
 ): Promise<StopSessionResponse> {
-  const response = await fetch(SESSION_ENDPOINT, {
-    method: "DELETE",
+  const response = await fetch(apiEndpoint(SESSION_STOP_ENDPOINT_PATH), {
+    method: "POST",
     headers: {
       Authorization: `Bearer ${ownerToken}`,
       "Content-Type": "application/json",
@@ -326,6 +332,12 @@ function isSessionSummary(value: unknown): value is SessionSummary {
     (typeof value.stoppedAt === "string" || value.stoppedAt === null) &&
     (typeof value.revokedAt === "string" || value.revokedAt === null)
   );
+}
+
+function apiEndpoint(path: string): string {
+  const base = tripGpsApiBase();
+
+  return base ? `${base}${path}` : path;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -636,7 +648,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       ownerTokenRef.current = session.ownerToken;
       sessionIdRef.current = session.session.id;
       seqRef.current = 0;
-      setViewerLink(session.viewerLink);
+      setViewerLink(resolveViewerLink(session.viewerLink));
       setSessionExpiresAt(session.session.expiresAt);
       setOwnerCode("");
 

@@ -1,13 +1,13 @@
 # Phase 8 — Reliability for the real trip
 
-**Priority:** P2 · **Branch:** `feat/gps` · **Depends on:** Phase 2, Phase 4, Phase 6
+**Priority:** P2 · **Branch:** `feat/gps` · **Depends on:** Phase 2, Phase 11, Phase 6
 **Read first:** `phase-00-overview.md` (cadence, guardrails)
 
 ## Goal
 Harden the MVP for a long ride where the network drops, the screen locks, or accuracy degrades.
 
 ## Files
-- **modify** `lib/trip-gps/client.ts` (real offline queue), `app/trip/001/live-tracker.tsx` (warnings, mode shortcuts), API route (light audit fields)
+- **modify** `lib/trip-gps/client.ts` (real offline queue), `app/trip/001/live-tracker.tsx` (warnings, mode shortcuts), Fastify backend audit fields
 
 ## Tasks
 1. **Offline queue:** buffer the last 1–3 points in memory/`localStorage` when offline; flush on reconnect (`online` event). Replace the Phase-3 skeleton.
