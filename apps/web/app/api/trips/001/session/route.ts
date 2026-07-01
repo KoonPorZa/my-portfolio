@@ -8,8 +8,6 @@ export const dynamic = "force-dynamic";
 const TRIP_ID = "001";
 const SESSION_PREFIX = "trip01";
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
-const OWNER_CODE_HASH_ENV = "TRIP_GPS_OWNER_CODE_HASH";
-const OWNER_CODE_SHA256_ENV = "TRIP_GPS_OWNER_CODE_SHA256";
 const OWNER_CODE_ENV = "TRIP_GPS_OWNER_CODE";
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
@@ -151,13 +149,6 @@ function createSessionId(now: number): string {
 }
 
 function verifyOwnerCode(code: string | null): "valid" | "invalid" | "not_configured" {
-  const ownerCodeHash =
-    process.env[OWNER_CODE_HASH_ENV]?.trim() || process.env[OWNER_CODE_SHA256_ENV]?.trim();
-
-  if (ownerCodeHash) {
-    return verifyToken(code ?? "", ownerCodeHash) ? "valid" : "invalid";
-  }
-
   const ownerCode = process.env[OWNER_CODE_ENV]?.trim();
 
   if (!ownerCode) {

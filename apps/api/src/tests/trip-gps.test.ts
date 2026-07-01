@@ -457,7 +457,7 @@ async function makeApp(nowMs = () => BASE_NOW): Promise<FastifyInstance> {
     CORS_ORIGINS: "http://localhost:3000",
     TRIP_GPS_ENABLED: "1",
     TRIP_GPS_STORE: "memory",
-    TRIP_GPS_OWNER_CODE_HASH: hashToken(OWNER_CODE),
+    TRIP_GPS_OWNER_CODE: OWNER_CODE,
   });
   const testApp = buildApp({
     env,

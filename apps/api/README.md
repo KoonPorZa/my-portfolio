@@ -11,7 +11,7 @@ repository, `node_modules` is already present.
 
 1. Copy `apps/api/.env.example` to `apps/api/.env`.
 2. Set `TRIP_GPS_STORE=memory` for local development without Supabase.
-3. Set `TRIP_GPS_OWNER_CODE_HASH` to the SHA-256 hash of your owner code.
+3. Set `TRIP_GPS_OWNER_CODE` to your owner code.
 4. Run the backend:
 
 ```bash
@@ -31,7 +31,7 @@ The API reads only server-side variables. Do not use `NEXT_PUBLIC_` for secrets.
 - `TRIP_GPS_STORE`: Use `auto`, `supabase`, `mock`, or `memory`.
 - `TRIP_GPS_SUPABASE_URL`: Supabase Project URL from **Data API** settings.
 - `TRIP_GPS_SUPABASE_SERVICE_ROLE_KEY`: Supabase `service_role` secret key.
-- `TRIP_GPS_OWNER_CODE_HASH`: Hex SHA-256 of the owner code.
+- `TRIP_GPS_OWNER_CODE`: The owner code (plaintext) that authorizes start/stop sharing.
 
 For local memory mode, Supabase variables can stay empty. When
 `TRIP_GPS_STORE=supabase`, the API fails fast unless the Supabase URL and

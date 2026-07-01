@@ -93,21 +93,21 @@ Set backend env in the host (start from `apps/api/.env.example`), and include
 
 ## 4. Environment variables
 
-Full reference (Thai): `docs/trip-gps-env-vars.md`. Quick summary:
+Full reference (Thai): `docs/env-doc.md`. Quick summary:
 
 - **Worker (`apps/web`) — set as Workers build vars / secrets:**
   - `NEXT_PUBLIC_TRIP_GPS_API_BASE` = the public Fastify URL,
     e.g. `https://api.koonporza.com` (build-time; inlined into the client).
   - `NEXT_PUBLIC_TRIP_GPS_UI`, `NEXT_PUBLIC_CF_BEACON_TOKEN` (optional).
   - The Worker needs **server** secrets (`TRIP_GPS_SUPABASE_*`,
-    `TRIP_GPS_OWNER_CODE*`) **only** if you rely on the in-app Next fallback API
+    `TRIP_GPS_OWNER_CODE`) **only** if you rely on the in-app Next fallback API
     at `app/api/trips/001/*` instead of the external Fastify backend. With
     `NEXT_PUBLIC_TRIP_GPS_API_BASE` set, those routes are dormant. Set runtime
     secrets with `npm exec -w web -- wrangler secret put <NAME>` (or in the
     dashboard) — never commit them.
 - **Backend (`apps/api`) — set on the Node host:** `CORS_ORIGINS`,
   `TRIP_GPS_ENABLED`, `TRIP_GPS_STORE`, `TRIP_GPS_SUPABASE_*`,
-  `TRIP_GPS_OWNER_CODE_HASH`. See `apps/api/.env.example`.
+  `TRIP_GPS_OWNER_CODE`. See `apps/api/.env.example`.
 
 ## 5. Custom domain koonporza.com
 

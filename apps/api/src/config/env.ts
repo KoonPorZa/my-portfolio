@@ -10,8 +10,6 @@ export type ServerEnv = {
   selectedTripGpsStore: TripGpsStoreMode;
   tripGpsSupabaseUrl: string;
   tripGpsSupabaseServiceRoleKey: string;
-  tripGpsOwnerCodeHash: string;
-  tripGpsOwnerCodeSha256: string;
   tripGpsOwnerCode: string;
 };
 
@@ -43,8 +41,6 @@ export function readServerEnv(source: EnvSource = process.env): ServerEnv {
     selectedTripGpsStore,
     tripGpsSupabaseUrl,
     tripGpsSupabaseServiceRoleKey,
-    tripGpsOwnerCodeHash: trim(source.TRIP_GPS_OWNER_CODE_HASH),
-    tripGpsOwnerCodeSha256: trim(source.TRIP_GPS_OWNER_CODE_SHA256),
     tripGpsOwnerCode: trim(source.TRIP_GPS_OWNER_CODE),
   };
 }

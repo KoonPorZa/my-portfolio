@@ -2,7 +2,7 @@
 
 **Priority:** P1 · **Branch:** `feat/gps` · **Depends on:** Phase 3
 **Read first:** `phase-00-overview.md` (guardrails, data contract, tables) and
-`docs/trip-gps-env-vars.md` (environment variables)
+`docs/env-doc.md` (environment variables)
 
 ## Goal
 
@@ -119,7 +119,7 @@ TRIP_GPS_ENABLED=1
 TRIP_GPS_STORE=supabase
 TRIP_GPS_SUPABASE_URL=
 TRIP_GPS_SUPABASE_SERVICE_ROLE_KEY=
-TRIP_GPS_OWNER_CODE_HASH=
+TRIP_GPS_OWNER_CODE=
 ```
 
 The frontend only needs public flags and the backend base URL.
@@ -129,8 +129,8 @@ NEXT_PUBLIC_TRIP_GPS_UI=1
 NEXT_PUBLIC_TRIP_GPS_API_BASE=https://api.koonporza.com
 ```
 
-Never expose `TRIP_GPS_SUPABASE_SERVICE_ROLE_KEY`, `TRIP_GPS_OWNER_CODE`, or
-`TRIP_GPS_OWNER_CODE_HASH` to the browser.
+Never expose `TRIP_GPS_SUPABASE_SERVICE_ROLE_KEY` or `TRIP_GPS_OWNER_CODE` to
+the browser.
 
 ## Storage
 

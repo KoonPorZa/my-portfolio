@@ -379,13 +379,6 @@ export class TripGpsService {
   }
 
   private verifyOwnerCode(code: string | null): OwnerCodeStatus {
-    const ownerCodeHash =
-      this.env.tripGpsOwnerCodeHash || this.env.tripGpsOwnerCodeSha256;
-
-    if (ownerCodeHash) {
-      return verifyToken(code ?? "", ownerCodeHash) ? "valid" : "invalid";
-    }
-
     if (!this.env.tripGpsOwnerCode) {
       return "not_configured";
     }
