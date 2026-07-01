@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 export type LiveLocation = {
+  sessionId: string | null;
   lat: number;
   lng: number;
   accuracyM: number | null;
@@ -15,11 +16,17 @@ export type LiveLocation = {
   serverTs: string | null;
 };
 
+export type LiveTrackPoint = LiveLocation & {
+  seq: number | null;
+};
+
 export type LiveState =
-  | { status: "connecting" }
-  | { status: "idle" }
-  | { status: "live"; loc: LiveLocation }
-  | { status: "unavailable" };
+  | { status: "connecting"; track: LiveTrackPoint[] }
+  | { status: "idle"; track: LiveTrackPoint[] }
+  | { status: "live"; loc: LiveLocation; track: LiveTrackPoint[] }
+  | { status: "unavailable"; track: LiveTrackPoint[] };
+
+const TRACK_LIMIT = 1500;
 
 function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -42,6 +49,7 @@ function toLoc(row: Record<string, unknown> | null | undefined): LiveLocation | 
   }
 
   return {
+    sessionId: str(row.session_id),
     lat,
     lng,
     accuracyM: num(row.accuracy_m),
@@ -53,25 +61,96 @@ function toLoc(row: Record<string, unknown> | null | undefined): LiveLocation | 
   };
 }
 
+function toTrackPoint(row: Record<string, unknown> | null | undefined): LiveTrackPoint | null {
+  const loc = toLoc(row);
+
+  if (!loc) {
+    return null;
+  }
+
+  return {
+    ...loc,
+    seq: typeof row?.seq === "number" && Number.isInteger(row.seq) ? row.seq : null,
+  };
+}
+
+function upsertTrackPoint(track: LiveTrackPoint[], point: LiveTrackPoint): LiveTrackPoint[] {
+  const matchIndex = track.findIndex((item) => {
+    if (point.seq !== null && item.seq !== null) {
+      return item.seq === point.seq;
+    }
+
+    return item.serverTs !== null && item.serverTs === point.serverTs;
+  });
+
+  const next = [...track];
+
+  if (matchIndex >= 0) {
+    next[matchIndex] = point;
+  } else {
+    next.push(point);
+  }
+
+  return next
+    .sort((a, b) => {
+      if (a.seq !== null && b.seq !== null) {
+        return a.seq - b.seq;
+      }
+
+      return timestampMs(a.serverTs) - timestampMs(b.serverTs);
+    })
+    .slice(-TRACK_LIMIT);
+}
+
+function timestampMs(value: string | null): number {
+  const ms = Date.parse(value ?? "");
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 // Subscribes to Supabase Realtime for the latest shared location on trip 001.
 // A row in trip_location_latest exists only while a session is active (the
 // session-end trigger deletes it), so presence = "currently sharing".
 export function useLiveLocation(): LiveState {
-  const [state, setState] = useState<LiveState>({ status: "connecting" });
+  const [state, setState] = useState<LiveState>({ status: "connecting", track: [] });
+  const sessionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
 
     if (!supabase) {
-      setState({ status: "unavailable" });
-      return undefined;
+      const timeoutId = window.setTimeout(() => {
+        setState({ status: "unavailable", track: [] });
+      }, 0);
+
+      return () => window.clearTimeout(timeoutId);
     }
 
     let subscribed = true;
 
+    const loadTrack = (sessionId: string) => {
+      void supabase
+        .from("trip_location_points")
+        .select("session_id,seq,lat,lng,accuracy_m,speed_mps,heading_deg,mode,client_ts,server_ts")
+        .eq("session_id", sessionId)
+        .order("seq", { ascending: true })
+        .limit(TRACK_LIMIT)
+        .then(({ data }) => {
+          if (!subscribed || sessionIdRef.current !== sessionId) {
+            return;
+          }
+
+          const track = (data ?? []).flatMap((row) => {
+            const point = toTrackPoint(row as Record<string, unknown>);
+            return point ? [point] : [];
+          });
+
+          setState((current) => ({ ...current, track }));
+        });
+    };
+
     void supabase
       .from("trip_location_latest")
-      .select("lat,lng,accuracy_m,speed_mps,heading_deg,mode,client_ts,server_ts")
+      .select("session_id,lat,lng,accuracy_m,speed_mps,heading_deg,mode,client_ts,server_ts")
       .order("server_ts", { ascending: false })
       .limit(1)
       .then(({ data }) => {
@@ -80,7 +159,12 @@ export function useLiveLocation(): LiveState {
         }
 
         const loc = toLoc(data?.[0]);
-        setState(loc ? { status: "live", loc } : { status: "idle" });
+        sessionIdRef.current = loc?.sessionId ?? null;
+        setState(loc ? { status: "live", loc, track: [] } : { status: "idle", track: [] });
+
+        if (loc?.sessionId) {
+          loadTrack(loc.sessionId);
+        }
       });
 
     const channel = supabase
@@ -94,12 +178,60 @@ export function useLiveLocation(): LiveState {
           }
 
           if (payload.eventType === "DELETE") {
-            setState({ status: "idle" });
+            sessionIdRef.current = null;
+            setState((current) => ({ status: "idle", track: current.track }));
             return;
           }
 
           const loc = toLoc(payload.new as Record<string, unknown>);
-          setState(loc ? { status: "live", loc } : { status: "idle" });
+
+          if (!loc) {
+            setState((current) => ({ status: "idle", track: current.track }));
+            return;
+          }
+
+          const previousSessionId = sessionIdRef.current;
+          sessionIdRef.current = loc.sessionId;
+          setState((current) => ({
+            status: "live",
+            loc,
+            track:
+              previousSessionId && loc.sessionId && previousSessionId !== loc.sessionId
+                ? []
+                : current.track,
+          }));
+
+          if (loc.sessionId && previousSessionId !== loc.sessionId) {
+            loadTrack(loc.sessionId);
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "trip_location_points" },
+        (payload) => {
+          if (!subscribed || payload.eventType === "DELETE") {
+            return;
+          }
+
+          const point = toTrackPoint(payload.new as Record<string, unknown>);
+
+          if (!point?.sessionId) {
+            return;
+          }
+
+          if (!sessionIdRef.current) {
+            sessionIdRef.current = point.sessionId;
+          }
+
+          if (sessionIdRef.current !== point.sessionId) {
+            return;
+          }
+
+          setState((current) => ({
+            ...current,
+            track: upsertTrackPoint(current.track, point),
+          }));
         }
       )
       .subscribe();

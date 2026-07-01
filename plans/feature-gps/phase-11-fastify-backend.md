@@ -177,6 +177,24 @@ causes unacceptable cold starts, document the impact and ask before upgrading.
    invalid token behavior, and too-frequent upload rejection.
 9. Railway deployment notes: `DEPLOY.md` §3 + committed `railway.json`.
 
+## Optional / future — Google motorcycle route endpoint (Phase 17)
+
+If the opt-in Google motorcycle map is enabled (see
+`phase-17-google-motorcycle-map.md`), the backend owns a small extra responsibility.
+Do **not** build this unless Phase 17 is being implemented:
+
+- Endpoint `GET /api/trips/:tripId/google-route` that server-side calls the Google
+  **Routes API** (`travelMode: "TWO_WHEELER"`) and returns the planned route geometry.
+- **Server-only key boundary:** `GOOGLE_MAPS_ROUTES_API_KEY` is read only here — never
+  exposed to the browser or any `NEXT_PUBLIC_*` (same boundary as the Supabase
+  service-role key).
+- The backend owns the **TypeBox response schema**, a **temporary TTL cache** of the
+  result (never permanent / committed), a **daily upstream quota cap**, and a
+  **per-IP rate limit** (Phase 14) so the endpoint can't burn Routes API quota.
+- **Deterministic fallback** (`{ fallback: true }` / `503`) when the key is missing,
+  quota is exhausted, or the upstream fails — so the frontend keeps the free
+  MapLibre + OSRM map. Never expose the server key or raw upstream error.
+
 ## Acceptance criteria
 
 - [ ] `GET /health` returns a stable JSON response.

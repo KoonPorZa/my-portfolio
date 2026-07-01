@@ -55,6 +55,13 @@ the auth boundary.**
    placement (the app's `CfWebAnalytics` component) and keep **automatic injection OFF**, so the beacon is
    never injected onto the token-bearing viewer URL. Never send a viewer-token URL to analytics.
 4. Record rule names/thresholds in deployment notes for rollback/debug.
+5. **Google route/map paths (only if Phase 17 is exposed):** if
+   `GET /api/trips/001/google-route` is public, add a WAF + rate-limit rule for it (it
+   proxies a **billed** Google upstream) — challenge/block abnormal per-IP bursts, as
+   defense-in-depth on top of the backend's own rate limit + TTL cache + daily cap
+   (Phase 14 / 17). The **planned** Google route is non-sensitive and MAY be briefly
+   edge-cached; but **never** cache live-location or token-bearing URLs
+   (`/api/trips/001/location*`, the session endpoints, or `/trip/001/live*` carrying `?t=`).
 
 ## Acceptance criteria
 - [ ] `/api/trips/001/location` (GET+POST) and session responses send `Cache-Control: no-store` — confirm with `curl -I` against the Fastify backend hostname.

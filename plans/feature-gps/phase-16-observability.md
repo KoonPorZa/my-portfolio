@@ -32,7 +32,8 @@ all with **zero forced cost** (any external service is opt-in via env, off by de
 3. **Log hygiene (security — real leak).** Pino logs `req.url`, which contains the
    viewer token `?t=<token>`. Add a URL serializer/redaction that strips or masks the
    `t` query param (Bearer already covered). Re-confirm owner code + service-role key
-   are never logged.
+   are never logged. If Phase 17 is enabled, also guarantee the **Google Routes API
+   key** and the public **Maps JS browser key** never appear in logs or error bodies.
 4. **Request tracing.** Accept an inbound client-provided `x-request-id` and echo it;
    include the request-id in **error response bodies** so a user can quote it.
 5. **Deploy status visibility.** Document reading Railway deploy state/logs
@@ -46,6 +47,11 @@ all with **zero forced cost** (any external service is opt-in via env, off by de
 7. **Metrics (optional).** A minimal counter (requests, 4xx/5xx, upload rate) via
    logs or a guarded `/metrics` — flag as optional; do **not** add Prometheus/Grafana
    unless asked.
+8. **Google route observability (only if Phase 17 enabled).** Log/count the Google
+   route endpoint's **cache hit/miss**, upstream request count, and daily-quota /
+   cost-guard state (near/at cap, fallback served) so cache effectiveness and spend are
+   visible. These logs/metrics MUST never include the Routes API key, the browser key,
+   or any viewer token.
 
 ## Acceptance criteria
 - [ ] `/health` (liveness) + `/ready` (readiness w/ store check) behave correctly
@@ -56,6 +62,8 @@ all with **zero forced cost** (any external service is opt-in via env, off by de
 - [ ] Error-tracking path documented (Sentry opt-in via env, off by default, no cost)
       OR a Railway log runbook.
 - [ ] Backend lint/build/test green; no secret exposure; no forced paid service.
+- [ ] (If Phase 17 enabled) Google route cache hit/miss + upstream count + quota/cost
+      state are observable, and no API key or viewer token appears in logs or error bodies.
 
 ## Out of scope
 - Full APM / Prometheus / Grafana stacks; frontend RUM (Cloudflare/Vercel analytics

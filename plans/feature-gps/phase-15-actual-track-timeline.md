@@ -45,8 +45,14 @@ map next to the planned road line, and (b) surface the **arrival timeline**
    (a) + optional (b); do **not** widen anon access to token/session tables.
 
 ## Frontend tasks (apps/web, trip design)
-4. **Map:** draw the actual track as a second polyline (green `#057f73`) with the
-   planned road line kept for reference; live marker at the head of the track.
+4. **Map (renderer-agnostic actual track):** draw the **actual GPS track** as a
+   second polyline (green `#057f73`) with the planned line kept for reference; live
+   marker at the head. The actual track is **our own GPS data**, so it is
+   renderer-agnostic: the **MapLibre fallback** draws it on MapLibre (over the
+   OSRM/OSM planned line), and the **optional Google mode** (Phase 17) draws the
+   **same** actual track on the Google map. The **planned Google `TWO_WHEELER` route
+   is shown ONLY in Google mode** — never draw it on MapLibre/OSM (Google ToS);
+   MapLibre keeps the free OSRM/OSM planned line.
 5. **Timeline:** render planned-vs-actual per stop on `/trip/001/live` — arrived
    time or "ยังไม่ถึง", delta badge (ช้า/เร็ว X นาที, color-coded with trip accents),
    mark current/next stop, overall progress. Reuse the Phase-13 `TripProgressTimeline`

@@ -41,6 +41,13 @@ exist; this phase closes the real gaps around them.
 4. **429 polish.** Add `Retry-After`; keep the generic body.
 5. **Config.** Expose limits/windows via env (`RATE_LIMIT_*`) with safe defaults;
    document in `docs/env-doc.md`.
+6. **Google route endpoint cost guard (only if Phase 17 is enabled).** The optional
+   `GET /api/trips/:tripId/google-route` (Phase 17) proxies a **billed** upstream
+   (Google Routes API). It MUST sit behind a strict per-IP rate limit **and** be
+   served **cache-first** (temporary TTL cache) so bursts/refreshes/bots cannot fan
+   out to the billed API. A cache miss triggers at most one upstream call per TTL
+   window; a daily upstream cap hard-stops spend and falls back to the free map. The
+   Routes API key is server-only; keep it out of logs (Phase 16).
 
 ## Tasks
 1. `app.ts`: enable `trustProxy` appropriately for Railway; comment why.
@@ -60,6 +67,10 @@ exist; this phase closes the real gaps around them.
 - [ ] Existing owner/viewer limits + `/health` exemption still pass; backend
       lint/build/test green.
 - [ ] No new heavy dependency; secrets unchanged; no token/oracle leak.
+- [ ] (If Phase 17 enabled) the Google route endpoint is strictly rate-limited and
+      **cache-first**: repeated/burst requests are served from the TTL cache and never
+      fan out to the billed Routes API; the daily upstream cap blocks quota-burning and
+      falls back to the free map.
 
 ## Out of scope
 - Cloudflare edge WAF / rate rules (Phase 10), CAPTCHA, account system, and

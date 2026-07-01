@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { WeatherNow } from "@/components/weather-now";
-import { buildTimedStops } from "@/lib/trip-stops";
+import { buildTimedStops, TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
 import { useLiveLocation } from "@/lib/trip-gps/use-live-location";
 import { TripRouteMap } from "./route-map";
 import styles from "./live.module.css";
@@ -74,6 +74,7 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
   }, []);
 
   const live = state.status === "live" ? state.loc : null;
+  const track = state.track;
   const ageMs = live ? ageMsFrom(live.serverTs, nowMs) : null;
   const mapsHref = live ? mapsLink(live.lat, live.lng) : null;
 
@@ -126,8 +127,11 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
               <p className={styles.eyebrow}>Route map</p>
               <h2 id="route-map-title">แผนที่เส้นทาง</h2>
             </div>
+            <a className={styles.mapButton} href={TRIP_DIRECTIONS_URL} target="_blank" rel="noreferrer">
+              เปิดเส้นทางใน Google Maps
+            </a>
           </header>
-          <TripRouteMap live={live ? { lat: live.lat, lng: live.lng } : null} />
+          <TripRouteMap live={live ? { lat: live.lat, lng: live.lng } : null} actualTrack={track} />
         </section>
 
         <div className={styles.locationGrid}>

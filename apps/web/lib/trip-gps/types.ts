@@ -39,6 +39,10 @@ export type LocationLatest = {
   serverTs: string;
 };
 
+export type LocationTrackPoint = LocationLatest & {
+  seq: number;
+};
+
 export type StopArrival = {
   index: number;
   arrivedAt: string;

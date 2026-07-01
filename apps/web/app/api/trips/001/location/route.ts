@@ -10,6 +10,7 @@ import {
   type LocationFreshness,
   type LocationLatest,
   type LocationPayload,
+  type LocationTrackPoint,
   type SessionAudit,
   type ShareSession,
   type TrackerMode,
@@ -22,6 +23,7 @@ export const dynamic = "force-dynamic";
 
 const MIN_UPLOAD_INTERVAL_MS = WAITING_POLL_MS;
 const MAX_SESSION_ID_LENGTH = 128;
+const TRACK_POINT_LIMIT = 1500;
 const NO_STORE_HEADERS = {
   "Cache-Control": "no-store",
   "CDN-Cache-Control": "no-store",
@@ -34,6 +36,7 @@ type ViewerLatestResponse = {
   freshness: LocationFreshness | null;
   viewerState: ViewerState;
   latest: LocationLatest | null;
+  track: LocationTrackPoint[];
   audit: SessionAudit | null;
   nextPollMs: number;
   message: string;
@@ -135,20 +138,21 @@ export async function GET(request: Request) {
   }
 
   const audit = await store.recordViewerAccess(session.id, new Date().toISOString());
+  const track = await store.getLocationTrack(session.id, TRACK_POINT_LIMIT);
 
   if (!session.active || session.stopped_at) {
-    return viewerResponse("stopped", null, null, "Live sharing has stopped.", audit);
+    return viewerResponse("stopped", null, null, "Live sharing has stopped.", audit, track);
   }
 
   const latest = await store.getLatestLocation(session.id);
 
   if (!latest) {
-    return viewerResponse("active", null, null, "Waiting for the first GPS point.", audit);
+    return viewerResponse("active", null, null, "Waiting for the first GPS point.", audit, track);
   }
 
   const freshness = freshnessFor(Date.now() - Date.parse(latest.serverTs));
 
-  return viewerResponse("active", freshness, latest, messageForFreshness(freshness), audit);
+  return viewerResponse("active", freshness, latest, messageForFreshness(freshness), audit, track);
 }
 
 async function readLocationPayload(request: Request): Promise<PayloadParseResult> {
@@ -226,7 +230,8 @@ function viewerResponse(
   freshness: LocationFreshness | null,
   latest: LocationLatest | null,
   message: string,
-  audit: SessionAudit | null
+  audit: SessionAudit | null,
+  track: LocationTrackPoint[]
 ) {
   const viewerState = viewerStateFor(status, freshness, latest);
 
@@ -236,6 +241,7 @@ function viewerResponse(
       freshness,
       viewerState,
       latest,
+      track,
       audit,
       nextPollMs: nextPollMs(viewerState),
       message,

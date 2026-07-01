@@ -27,7 +27,7 @@ Live-location sharing for the existing private roadbook at `app/trip/001`.
 1. **Branch:** all implementation happens on **`feat/gps`**. Never commit feature code to `develop`. (Phase 1 creates/switches the branch.)
 2. **Security boundary:** `/trip/001` is **public now** (the old client-side password gate was removed). Page access is therefore **not** a security boundary — owner upload and viewer reads are gated only by server-side tokens / a server-side owner code (Phase 7). Never gate live location on page access or any client-side secret.
 3. **Secrets:** no server secret / Supabase service-role key in the client bundle or any `NEXT_PUBLIC_*`. Server-only env, accessed only in Route Handlers, Fastify handlers, or server modules.
-4. **Cost = 0 ฿:** stay inside free tiers. Do not add a paid API, billing card, or paid map/tile provider without updating the plan and asking first. MVP map = Google Maps external link.
+4. **Cost = default 0 ฿:** the default/fallback stack stays inside free tiers (MapLibre + OSRM/OSM route geometry + a Google Maps external link). The **Google motorcycle map** (Google Maps JS + Routes API `TWO_WHEELER`, **Phase 17**) is an **opt-in paid/billing path** — it must NOT be enabled without first asking, setting a low daily quota, and wiring the cost guard (temporary cache + rate limit + fallback). Do not add any other paid API, billing card, or paid map/tile provider without updating the plan and asking first.
 5. **Dependency gate:** add a dependency only when its phase calls for it. Approved for the web app: `leaflet` (optional map enhancement). Approved for the Fastify backend track in Phase 11: `fastify`, `@fastify/cors`, `@fastify/helmet`, `@fastify/rate-limit`, `@fastify/sensible`, `@sinclair/typebox`, `@supabase/supabase-js`, `tsx`, and `vitest`. Not now: `react-leaflet`, `socket.io`, `firebase`, and `zod`.
 6. **Owner-initiated:** location is only captured/sent after the owner taps **Start**. Before Start, nothing leaves the device.
 7. **Verify before done:** `npm run lint` + `npm run build` must pass. If a phase can't be tested on a real mobile device over HTTPS, state the validation gap explicitly.
@@ -41,9 +41,17 @@ Live-location sharing for the existing private roadbook at `app/trip/001`.
 | API | Fastify + TypeScript backend under `apps/api`, served from `api.koonporza.com` or the selected low-cost backend host |
 | DB | Supabase Postgres via `@supabase/supabase-js@2`, **backend/server-side only** |
 | Realtime | Viewer **polling 30–60s** (no WebSocket in MVP) |
-| Map | MVP: coordinates + Google Maps link → enhancement: vanilla `leaflet` (client-only) |
+| Map (default/fallback) | **MapLibre GL** (`components/ui/map.tsx`, mapcn) + **OSRM/OSM** route geometry (`lib/trip-route-geometry.ts`; BRouter is an alternative free router) + a Google Maps external link. Free, no billing. |
+| Map (optional exact-Google mode) | **Google Maps JS** renderer + Google **Routes API `TWO_WHEELER`** planned route — opt-in, **billed**, gated + cost-guarded (**Phase 17**). Google route geometry renders **only** on the Google map. |
 | Validation | Shared domain utils in `lib/trip-gps/`; Fastify request/response schemas use TypeBox |
 | Tokens | Node `crypto`: random token + SHA-256 hash stored server-side; split owner/viewer |
+
+> **Google ToS note (Phase 17):** when the optional Google mode is on, Google
+> Routes/Directions geometry and Google map content may be displayed **only on a
+> Google Maps JS map** — never draw Google-derived polylines/route geometry on
+> MapLibre/OSM, and never persist Google route geometry as permanent static data
+> (it is a temporary, TTL-bounded cache only). The Routes API key stays **server-only**;
+> the Maps JS browser key is public but must be **HTTP-referrer + quota restricted**.
 
 ## Shared data contract
 
@@ -110,9 +118,11 @@ work must follow Phase 11.
 | `phase-14-api-hardening.md` | Rate-limit hardening + bot/abuse guard | P1 | 11 |
 | `phase-15-actual-track-timeline.md` | Actual track polyline + arrival timeline v2 | P2 | 13, 11 |
 | `phase-16-observability.md` | Observability & ops (health/logs/errors) | P2 | 11 |
+| `phase-17-google-motorcycle-map.md` | Optional Google motorcycle map (Routes API TWO_WHEELER) | P3 (opt-in, **billed**) | 06, 11, 14, 15 |
 
 **Suggested order:** 01 → 03 → 02 → 11 → 07 → 06 → 08 → (09 only if needed).
 **Post-MVP hardening/ops:** 14 (API hardening, P1 — do early, owner-code brute-force guard) → 15 (actual track + arrival timeline) → 16 (observability).
+**Optional (billed, ask first):** 17 (Google motorcycle map) — only after 14's cost guard is in place; default stays on the free MapLibre + OSRM map.
 Phase 10 (Cloudflare edge) is **mostly Cloudflare-dashboard config done at deploy time** — its only
 repo code (Fastify API `no-store` headers + a privacy-safe analytics beacon) can land any time after 11/06.
 P0–P1 = shippable MVP. P2 = hardening. Future = optional. Cloudflare = edge defense-in-depth, **not** auth.

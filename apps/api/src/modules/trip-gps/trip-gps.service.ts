@@ -16,6 +16,7 @@ import {
   type LocationFreshness,
   type LocationLatest,
   type LocationPayload,
+  type LocationTrackPoint,
   type ProgressResponse,
   type PublicSession,
   type SessionAudit,
@@ -51,6 +52,7 @@ const DEFAULT_TTL_MS = 24 * 60 * MINUTE_MS;
 const SESSION_PREFIX = "trip01";
 const EARTH_RADIUS_M = 6_371_000;
 const DEGREES_TO_RADIANS = Math.PI / 180;
+const TRACK_POINT_LIMIT = 1500;
 
 // Keep this order in sync with the stops array in apps/web/app/trip/001/trip-client.tsx.
 export const TRIP_001_STOP_COORDS: [number, number][] = [
@@ -270,6 +272,7 @@ export class TripGpsService {
 
     const audit = await this.repo.recordViewerAccess(session.id, nowIso(now));
     const stopArrivals = await this.repo.getStopArrivals(session.id);
+    const track = await this.repo.getLocationTrack(session.id, TRACK_POINT_LIMIT);
 
     if (!session.active || session.stopped_at) {
       return viewerResponse(
@@ -278,7 +281,8 @@ export class TripGpsService {
         null,
         "Live sharing has stopped.",
         audit,
-        stopArrivals
+        stopArrivals,
+        track
       );
     }
 
@@ -291,7 +295,8 @@ export class TripGpsService {
         null,
         "Waiting for the first GPS point.",
         audit,
-        stopArrivals
+        stopArrivals,
+        track
       );
     }
 
@@ -303,7 +308,8 @@ export class TripGpsService {
       latest,
       messageForFreshness(freshness),
       audit,
-      stopArrivals
+      stopArrivals,
+      track
     );
   }
 
@@ -502,7 +508,8 @@ function viewerResponse(
   latest: LocationLatest | null,
   message: string,
   audit: SessionAudit | null,
-  stopArrivals: StopArrival[]
+  stopArrivals: StopArrival[],
+  track: LocationTrackPoint[]
 ): ViewerLatestResponse {
   const viewerState = viewerStateFor(status, freshness, latest);
 
@@ -511,6 +518,7 @@ function viewerResponse(
     freshness,
     viewerState,
     latest,
+    track,
     stopArrivals,
     audit,
     nextPollMs: nextPollMs(viewerState),

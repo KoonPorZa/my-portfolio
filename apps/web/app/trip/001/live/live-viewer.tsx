@@ -5,6 +5,7 @@ import {
   TRACKER_MODES,
   type LocationFreshness,
   type LocationLatest,
+  type LocationTrackPoint,
   type StopArrival,
   type TrackerMode,
   type UploadReason,
@@ -12,7 +13,7 @@ import {
 } from "@/lib/trip-gps/types";
 import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import { WeatherNow } from "@/components/weather-now";
-import { buildTimedStops } from "@/lib/trip-stops";
+import { buildTimedStops, TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
 import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
 import { TripRouteMap } from "./route-map";
 import styles from "./live.module.css";
@@ -22,6 +23,7 @@ type ViewerLatestResponse = {
   freshness: LocationFreshness | null;
   viewerState: ViewerState;
   latest: LocationLatest | null;
+  track: LocationTrackPoint[];
   stopArrivals: StopArrival[];
   nextPollMs: number;
   message: string;
@@ -208,6 +210,7 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
   }, [fetchLatest, lastCheckedAt, nextDelayMs, viewerState]);
 
   const latest = latestResponse?.latest ?? null;
+  const track = latestResponse?.track ?? [];
   const stopArrivals = latestResponse?.stopArrivals ?? [];
   const descriptor = stateCopy[viewerState];
   const badgeClassName = cx(styles.badge, badgeToneClass(descriptor.tone));
@@ -273,8 +276,11 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
               <p className={styles.eyebrow}>Route map</p>
               <h2 id="route-map-title">แผนที่เส้นทาง</h2>
             </div>
+            <a className={styles.mapButton} href={TRIP_DIRECTIONS_URL} target="_blank" rel="noreferrer">
+              เปิดเส้นทางใน Google Maps
+            </a>
           </header>
-          <TripRouteMap live={latest ? { lat: latest.lat, lng: latest.lng } : null} />
+          <TripRouteMap live={latest ? { lat: latest.lat, lng: latest.lng } : null} actualTrack={track} />
         </section>
 
         <div className={styles.locationGrid}>
@@ -500,6 +506,7 @@ function coerceViewerResponse(value: unknown): ViewerLatestResponse | null {
   const freshness = coerceFreshness(value.freshness);
   const viewerState = coerceViewerState(value.viewerState);
   const latest = value.latest === null ? null : coerceLatest(value.latest);
+  const track = coerceTrack(value.track);
   const stopArrivals = coerceStopArrivals(value.stopArrivals);
   const nextPollMs = typeof value.nextPollMs === "number" ? clampPoll(value.nextPollMs) : MAX_POLL_MS;
   const message = typeof value.message === "string" ? value.message : "";
@@ -513,10 +520,32 @@ function coerceViewerResponse(value: unknown): ViewerLatestResponse | null {
     freshness,
     viewerState,
     latest,
+    track,
     stopArrivals,
     nextPollMs,
     message,
   };
+}
+
+function coerceTrack(value: unknown): LocationTrackPoint[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    const latest = coerceLatest(entry);
+
+    if (!latest || !isRecord(entry) || typeof entry.seq !== "number" || !Number.isInteger(entry.seq)) {
+      return [];
+    }
+
+    return [
+      {
+        ...latest,
+        seq: entry.seq,
+      },
+    ];
+  });
 }
 
 function coerceStopArrivals(value: unknown): StopArrival[] {

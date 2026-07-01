@@ -18,13 +18,14 @@ import styles from "./route-map.module.css";
 // that sits well under the warm roadbook palette.
 const CARTO_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 const ROUTE_COLOR = "#cf451c";
+const ACTUAL_TRACK_COLOR = "#057f73";
 
 // trip-stops stores coords as [lat, lng]; MapLibre / GeoJSON expect [lng, lat].
-// Used only for the stop markers and the initial fit — the drawn line follows
-// real roads via ROUTE_ROAD_GEOMETRY below.
 const routeCoords: [number, number][] = stops.map(({ coords }) => [coords[1], coords[0]]);
+const mapBoundsCoords = ROUTE_ROAD_GEOMETRY.length > 0 ? ROUTE_ROAD_GEOMETRY : routeCoords;
 
 type LivePoint = { lat: number; lng: number } | null;
+type TrackPoint = { lat: number; lng: number };
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -40,7 +41,7 @@ function FitToRoute({ live }: { live: LivePoint }) {
   useEffect(() => {
     if (!map || !isLoaded) return;
 
-    const points = live ? [...routeCoords, [live.lng, live.lat] as [number, number]] : routeCoords;
+    const points = live ? [...mapBoundsCoords, [live.lng, live.lat] as [number, number]] : mapBoundsCoords;
     const lngs = points.map((p) => p[0]);
     const lats = points.map((p) => p[1]);
 
@@ -57,7 +58,17 @@ function FitToRoute({ live }: { live: LivePoint }) {
   return null;
 }
 
-export function RouteMapImpl({ live }: { live: LivePoint }) {
+export function RouteMapImpl({
+  live,
+  actualTrack,
+}: {
+  live: LivePoint;
+  actualTrack: TrackPoint[];
+}) {
+  const actualTrackCoords = actualTrack
+    .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng))
+    .map((point): [number, number] => [point.lng, point.lat]);
+
   return (
     <Map
       className={styles.map}
@@ -67,7 +78,17 @@ export function RouteMapImpl({ live }: { live: LivePoint }) {
     >
       <FitToRoute live={live} />
 
-      <MapRoute coordinates={ROUTE_ROAD_GEOMETRY} color={ROUTE_COLOR} width={3.5} opacity={0.92} />
+      <MapRoute coordinates={ROUTE_ROAD_GEOMETRY} color={ROUTE_COLOR} width={3.25} opacity={0.42} />
+
+      {actualTrackCoords.length >= 2 ? (
+        <MapRoute
+          id="actual-trip-track"
+          coordinates={actualTrackCoords}
+          color={ACTUAL_TRACK_COLOR}
+          width={4.25}
+          opacity={0.95}
+        />
+      ) : null}
 
       {stops.map((stop, index) => {
         const major = index === 0 || index === stops.length - 1;

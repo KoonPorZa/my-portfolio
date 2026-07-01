@@ -3,6 +3,7 @@ import "server-only";
 import type {
   LocationLatest,
   LocationPayload,
+  LocationTrackPoint,
   SessionAudit,
   ShareSession,
 } from "./types";
@@ -25,6 +26,7 @@ export interface LocationStore {
   findOwnerSessionByToken(token: string, sessionId: string): Promise<ShareSession | null>;
   findViewerSessionByToken(token: string): Promise<ShareSession | null>;
   getLatestLocation(sessionId: string): Promise<LocationLatest | null>;
+  getLocationTrack(sessionId: string, limit: number): Promise<LocationTrackPoint[]>;
   recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null>;
   recordLocation(point: LocationStorePoint): Promise<LocationLatest>;
   recordUploadSuccess(sessionId: string): Promise<SessionAudit | null>;
@@ -76,6 +78,14 @@ class InMemoryLocationStore implements LocationStore {
 
   async getLatestLocation(sessionId: string): Promise<LocationLatest | null> {
     return this.latest.get(sessionId) ?? null;
+  }
+
+  async getLocationTrack(sessionId: string, limit: number): Promise<LocationTrackPoint[]> {
+    return (this.history.get(sessionId) ?? [])
+      .slice()
+      .sort((a, b) => a.seq - b.seq)
+      .slice(-Math.max(0, limit))
+      .map(toTrackPoint);
   }
 
   async recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null> {
@@ -278,6 +288,29 @@ export class SupabaseLocationStore implements LocationStore {
     }
 
     return data ? toLocationLatest(data) : null;
+  }
+
+  async getLocationTrack(sessionId: string, limit: number): Promise<LocationTrackPoint[]> {
+    const normalizedLimit = Math.min(Math.max(Math.trunc(limit), 0), 5000);
+
+    if (normalizedLimit === 0) {
+      return [];
+    }
+
+    const { data, error } = await this.supabase
+      .from("trip_location_points")
+      .select()
+      .eq("session_id", sessionId)
+      .order("seq", { ascending: false })
+      .limit(normalizedLimit);
+
+    if (error) {
+      throwSupabaseError("get location track", error);
+    }
+
+    return data
+      .map(toLocationTrackPoint)
+      .sort((a, b) => a.seq - b.seq);
   }
 
   async recordSessionError(sessionId: string, message: string): Promise<SessionAudit | null> {
@@ -534,6 +567,28 @@ function toLocationLatest(row: LatestRow): LocationLatest {
     reason: row.reason,
     clientTs: row.client_ts,
     serverTs: row.server_ts,
+  };
+}
+
+function toLocationTrackPoint(row: TripGpsTable<"trip_location_points">["Row"]): LocationTrackPoint {
+  return {
+    ...toLocationLatest(row),
+    seq: row.seq,
+  };
+}
+
+function toTrackPoint(point: LocationStorePoint): LocationTrackPoint {
+  return {
+    lat: point.lat,
+    lng: point.lng,
+    accuracyM: point.accuracyM,
+    speedMps: point.speedMps ?? null,
+    headingDeg: point.headingDeg ?? null,
+    mode: point.mode,
+    reason: point.reason,
+    clientTs: point.clientTs,
+    serverTs: point.serverTs,
+    seq: point.seq,
   };
 }
 

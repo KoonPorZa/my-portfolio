@@ -32,6 +32,69 @@
   letter-spacing: 0.04em;
 }
 
+.routeSourceBadge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  max-width: min(calc(100% - 24px), 320px);
+  padding: 7px 10px;
+  border: 1px solid rgba(205, 189, 156, 0.82);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.92);
+  color: var(--ink, #241c13);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 7px 18px rgba(54, 35, 12, 0.14);
+  pointer-events: none;
+}
+
+.routeLegend {
+  position: absolute;
+  left: 12px;
+  bottom: 28px;
+  z-index: 2;
+  display: flex;
+  max-width: min(calc(100% - 24px), 360px);
+  flex-wrap: wrap;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.routeLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 27px;
+  padding: 5px 9px;
+  border: 1px solid rgba(205, 189, 156, 0.82);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.9);
+  color: var(--ink, #241c13);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 7px 18px rgba(54, 35, 12, 0.12);
+}
+
+.routeLegend i {
+  display: block;
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.plannedSwatch {
+  background: var(--accent, #cf451c);
+}
+
+.actualSwatch {
+  background: #057f73;
+}
+
 /* Keep MapLibre's UI legible against the warm paper theme */
 .mapFrame :global(.maplibregl-ctrl-attrib) {
   font-size: 10px;

@@ -80,6 +80,13 @@ const LocationLatestSchema = Type.Object({
   serverTs: Type.String(),
 });
 
+const LocationTrackPointSchema = Type.Intersect([
+  LocationLatestSchema,
+  Type.Object({
+    seq: Type.Number(),
+  }),
+]);
+
 const PublicSessionSchema = Type.Object({
   id: Type.String(),
   tripId: Type.String(),
@@ -119,6 +126,7 @@ export const ViewerLatestResponseSchema = Type.Object({
     Type.Literal("stopped"),
   ]),
   latest: Type.Union([LocationLatestSchema, Type.Null()]),
+  track: Type.Array(LocationTrackPointSchema),
   stopArrivals: Type.Array(StopArrivalSchema),
   audit: Type.Union([SessionAuditSchema, Type.Null()]),
   nextPollMs: Type.Number(),

@@ -146,6 +146,7 @@ export const stops: Stop[] = [
 ];
 
 export const TRIP_STOP_COUNT = stops.length;
+export const TRIP_DIRECTIONS_URL = buildTripDirectionsUrl(stops);
 
 export function toHHMM(totalMinutes: number): string {
   const mins = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
@@ -189,4 +190,30 @@ export function buildTimedStops(): TimedStop[] {
       restLabel: stop.restMin ? `${stop.restMin} นาที` : "ไม่พักต่อ",
     };
   });
+}
+
+function buildTripDirectionsUrl(routeStops: Stop[]): string {
+  const origin = routeStops[0];
+  const destination = routeStops.at(-1);
+
+  if (!origin || !destination) {
+    return "https://www.google.com/maps";
+  }
+
+  const waypoints = routeStops.slice(1, -1).map((stop) => latLng(stop.coords));
+  const params = new URLSearchParams({
+    api: "1",
+    origin: latLng(origin.coords),
+    destination: latLng(destination.coords),
+  });
+
+  if (waypoints.length > 0) {
+    params.set("waypoints", waypoints.join("|"));
+  }
+
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+}
+
+function latLng([lat, lng]: [number, number]): string {
+  return `${lat},${lng}`;
 }

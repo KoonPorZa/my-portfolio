@@ -159,6 +159,14 @@ describe("Trip GPS Fastify routes", () => {
       lng: 100.2209807,
       accuracyM: 24,
     });
+    expect(body.track).toEqual([
+      expect.objectContaining({
+        seq: 1,
+        lat: 13.5361776,
+        lng: 100.2209807,
+        accuracyM: 24,
+      }),
+    ]);
     expect(body.stopArrivals).toEqual([
       {
         index: 8,
@@ -166,6 +174,35 @@ describe("Trip GPS Fastify routes", () => {
         source: "auto",
       },
     ]);
+  });
+
+  it("returns the uploaded track points in seq order for viewers", async () => {
+    let now = BASE_NOW;
+    app = await makeApp(() => now);
+    const session = await startSession(app);
+
+    expect((await uploadLocation(app, session, "start", 1)).statusCode).toBe(200);
+
+    now = BASE_NOW + 60_000;
+
+    expect(
+      (
+        await uploadLocation(app, session, "manual", 2, {
+          lat: 13.55,
+          lng: 100.24,
+          clientTs: new Date(now).toISOString(),
+        })
+      ).statusCode
+    ).toBe(200);
+
+    const viewerBody = await getViewerLatest(app, session);
+
+    expect(viewerBody.track.map((point) => point.seq)).toEqual([1, 2]);
+    expect(viewerBody.track.at(-1)).toMatchObject({
+      seq: 2,
+      lat: 13.55,
+      lng: 100.24,
+    });
   });
 
   it("auto-stamps a nearby stop once on owner uploads", async () => {
