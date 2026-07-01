@@ -165,6 +165,36 @@ Full reference (Thai): `docs/env-doc.md`. Quick summary:
   `TRIP_GPS_OWNER_CODE`. **Do NOT set `PORT`** — Railway injects it and the app
   reads it. Reference values: `apps/api/.env.example` / your `apps/api/.env.prod`.
 
+## Optional: Google motorcycle map (Phase 17)
+
+**Off by default; enabling is opt-in and billed.**
+
+1. **Enable APIs & create two separate API keys** in Google Cloud console:
+   - Enable **Routes API** and **Maps JavaScript API**.
+   - Create **two separate API keys** (one for each API).
+
+2. **Routes API key** (`GOOGLE_MAPS_ROUTES_API_KEY`):
+   - In Google Cloud console, restrict this key to **Routes API only**.
+   - Add it as a **server-only** env var on the **Railway backend**
+     (never in `NEXT_PUBLIC_*` or frontend).
+   - Also set on Railway: `TRIP_GOOGLE_ROUTE_CACHE_TTL_SECONDS` (default `86400`)
+     and `TRIP_GOOGLE_ROUTE_DAILY_QUOTA` (cost guard; default `50`).
+
+3. **Maps JavaScript API key** (`NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`):
+   - In Google Cloud console, restrict this key to **Maps JavaScript API only**.
+   - Add an **HTTP-referrer allowlist**: `koonporza.com` and `www.koonporza.com`.
+   - Set a **low daily quota** (e.g. 100 requests/day) in the console.
+   - Set `NEXT_PUBLIC_TRIP_GOOGLE_MAP_ENABLED=1` + the key in the **frontend env**
+     (Vercel / `.env.production`), then redeploy to Cloudflare Workers.
+
+4. **Cost guard**: With both flags off (default), the viewer costs 0฿ and works
+   fully on the free MapLibre + BRouter/OSM map. If keys are missing, quota is
+   exhausted, or the endpoint fails → automatic fallback to MapLibre (no loss
+   of service). Leave both flags off to stay at 0฿ unless you explicitly enable
+   the Google mode.
+
+Full env reference: `docs/env-doc.md`.
+
 ## 5. Custom domain koonporza.com
 
 With the zone on Cloudflare, attach the domain to the Worker directly (no manual

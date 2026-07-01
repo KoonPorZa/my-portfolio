@@ -155,3 +155,23 @@ export const ErrorResponseSchema = Type.Object({
   error: Type.String(),
   message: Type.String(),
 });
+
+// Superset object: fallback=false → all fields present; fallback=true → only reason present.
+// Using a superset (all fields optional except fallback) avoids Type.Union branch-selection
+// issues in fast-json-stringify that can silently drop fields.
+export const GoogleRouteResponseSchema = Type.Object({
+  fallback: Type.Boolean(),
+  reason: Type.Optional(
+    Type.Union([
+      Type.Literal("disabled"),
+      Type.Literal("quota"),
+      Type.Literal("upstream_error"),
+    ])
+  ),
+  encodedPolyline: Type.Optional(Type.String()),
+  distanceMeters: Type.Optional(Type.Number()),
+  durationSeconds: Type.Optional(Type.Number()),
+  source: Type.Optional(Type.Literal("google")),
+  cachedAt: Type.Optional(Type.String()),
+  expiresAt: Type.Optional(Type.String()),
+});

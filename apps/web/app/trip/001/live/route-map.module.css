@@ -183,3 +183,48 @@
     transition: none;
   }
 }
+
+/* ── Phase 17: Google map toggle bar (rendered only when flag is ON) ──────── */
+
+.mapToggleBar {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+  margin-bottom: 8px;
+}
+
+.mapToggle,
+.mapToggleActive {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1.5px solid var(--line-strong, #cdbd9c);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.7);
+  color: var(--ink, #241c13);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  text-align: center;
+}
+
+.mapToggleActive {
+  background: var(--accent, #cf451c);
+  border-color: var(--accent-deep, #a4330f);
+  color: #fff6f0;
+}
+
+.mapToggle:hover {
+  background: rgba(207, 69, 28, 0.08);
+  border-color: var(--accent, #cf451c);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapToggle,
+  .mapToggleActive {
+    transition: none;
+  }
+}

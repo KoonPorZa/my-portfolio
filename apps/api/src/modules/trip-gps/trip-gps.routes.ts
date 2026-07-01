@@ -6,6 +6,7 @@ import { readBearerToken } from "./trip-gps.service";
 import {
   CreateSessionResponseSchema,
   ErrorResponseSchema,
+  GoogleRouteResponseSchema,
   LocationPayloadSchema,
   ProgressBodySchema,
   ProgressResponseSchema,
@@ -17,9 +18,11 @@ import {
   ViewerLatestResponseSchema,
   ViewerQuerySchema,
 } from "./trip-gps.schema";
+import type { GoogleRouteHandler } from "./google-route";
 
 type TripGpsRouteOptions = {
   service: TripGpsService;
+  googleRouteHandler: GoogleRouteHandler;
 };
 
 type TripParams = {
@@ -55,6 +58,12 @@ const VIEWER_RATE_LIMIT = {
   max: 60,
   timeWindow: "1 minute",
   groupId: "trip-gps-viewer",
+};
+
+const GOOGLE_ROUTE_RATE_LIMIT = {
+  max: 10,
+  timeWindow: "1 minute",
+  groupId: "trip-gps-google",
 };
 
 export async function tripGpsRoutes(
@@ -180,6 +189,27 @@ export async function tripGpsRoutes(
         sessionId: normalizeOptionalString(request.body.sessionId),
         action: request.body.action === "revoke" ? "revoke" : "stop",
       });
+    }
+  );
+
+  fastify.get<{
+    Params: TripParams;
+  }>(
+    "/api/trips/:tripId/google-route",
+    {
+      config: {
+        rateLimit: GOOGLE_ROUTE_RATE_LIMIT,
+      },
+      schema: {
+        params: TripParamsSchema,
+        response: {
+          200: GoogleRouteResponseSchema,
+          429: ErrorResponseSchema,
+        },
+      },
+    },
+    async (request) => {
+      return options.googleRouteHandler(request.params.tripId);
     }
   );
 

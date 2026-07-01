@@ -19,6 +19,7 @@ import {
 } from "./modules/trip-gps/trip-gps.repo";
 import { tripGpsRoutes } from "./modules/trip-gps/trip-gps.routes";
 import { TripGpsService } from "./modules/trip-gps/trip-gps.service";
+import { createGoogleRouteHandler } from "./modules/trip-gps/google-route";
 import { buildCorsOptions } from "./plugins/cors";
 import { rateLimitOptions } from "./plugins/rate-limit";
 import { registerRequestId } from "./plugins/request-id";
@@ -46,6 +47,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
   const repo = options.repo ?? createTripGpsRepo(env);
   const service = new TripGpsService(repo, env, options.nowMs);
+  const googleRouteHandler = createGoogleRouteHandler(env, app.log);
 
   app.addHook("onRequest", async (request, reply) => {
     if (request.url.startsWith("/api/trips/")) {
@@ -71,7 +73,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   void app.register(helmet, helmetOptions);
   void app.register(rateLimit, rateLimitOptions);
   void app.register(healthRoutes);
-  void app.register(tripGpsRoutes, { service });
+  void app.register(tripGpsRoutes, { service, googleRouteHandler });
 
   return app;
 }

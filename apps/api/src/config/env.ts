@@ -11,6 +11,9 @@ export type ServerEnv = {
   tripGpsSupabaseUrl: string;
   tripGpsSupabaseServiceRoleKey: string;
   tripGpsOwnerCode: string;
+  googleMapsRoutesApiKey: string;
+  tripGoogleRouteCacheTtlSeconds: number;
+  tripGoogleRouteDailyQuota: number;
 };
 
 type EnvSource = NodeJS.ProcessEnv | Record<string, string | undefined>;
@@ -42,6 +45,15 @@ export function readServerEnv(source: EnvSource = process.env): ServerEnv {
     tripGpsSupabaseUrl,
     tripGpsSupabaseServiceRoleKey,
     tripGpsOwnerCode: trim(source.TRIP_GPS_OWNER_CODE),
+    googleMapsRoutesApiKey: trim(source.GOOGLE_MAPS_ROUTES_API_KEY),
+    tripGoogleRouteCacheTtlSeconds: readPositiveInteger(
+      source.TRIP_GOOGLE_ROUTE_CACHE_TTL_SECONDS,
+      86_400
+    ),
+    tripGoogleRouteDailyQuota: readNonNegativeInteger(
+      source.TRIP_GOOGLE_ROUTE_DAILY_QUOTA,
+      50
+    ),
   };
 }
 
@@ -151,6 +163,30 @@ function isPlaceholder(value: string): boolean {
     normalized.includes("your-") ||
     normalized.includes("your_")
   );
+}
+
+function readPositiveInteger(value: string | undefined, defaultValue: number): number {
+  const normalized = trim(value);
+
+  if (!normalized) {
+    return defaultValue;
+  }
+
+  const parsed = Number(normalized);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultValue;
+}
+
+function readNonNegativeInteger(value: string | undefined, defaultValue: number): number {
+  const normalized = trim(value);
+
+  if (!normalized) {
+    return defaultValue;
+  }
+
+  const parsed = Number(normalized);
+
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : defaultValue;
 }
 
 function trim(value: string | undefined): string {
