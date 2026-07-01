@@ -408,6 +408,121 @@
   }
 }
 
+/* Realtime live-location status card (Supabase Realtime) */
+.liveStatus {
+  scroll-margin-top: 16px;
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+  padding: 13px 15px;
+}
+
+.liveStatusLive {
+  border-color: rgba(173, 39, 48, 0.4);
+  background: linear-gradient(135deg, var(--card), var(--danger-tint));
+}
+
+.liveStatusHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--trip-mono);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--danger);
+  border: 1px solid rgba(173, 39, 48, 0.35);
+  background: var(--danger-tint);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.liveBadgeDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--danger);
+  animation: livepulse-red 1.5s ease-out infinite;
+}
+
+.liveStatusTitle {
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--ink);
+}
+
+.liveStatusMeta {
+  margin: 9px 0 0;
+  font-family: var(--trip-mono);
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+
+.liveStatusActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-top: 11px;
+}
+
+.liveMapLink {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--accent-deep);
+}
+
+.liveStatusUpdated {
+  font-family: var(--trip-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.liveStatusIdle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.liveIdleDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+@keyframes livepulse-red {
+  0% {
+    box-shadow: 0 0 0 0 rgba(173, 39, 48, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(173, 39, 48, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(173, 39, 48, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveBadgeDot {
+    animation: none;
+  }
+}
+
 .primaryButton:active,
 .ghostButton:active,
 .mapLink:active {

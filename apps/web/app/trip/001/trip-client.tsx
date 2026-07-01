@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -16,6 +15,7 @@ import {
   type WeatherTone,
 } from "@/lib/weather";
 import { buildTimedStops, duration, type TimedStop } from "@/lib/trip-stops";
+import { TripLiveStatus } from "./live-status";
 import styles from "./trip.module.css";
 
 const principles = [
@@ -381,16 +381,18 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <a className={styles.primaryButton} href="#stops">
               ไปที่ไทม์ไลน์ ↓
             </a>
-            <Link className={styles.liveButton} href="/trip/001/live">
+            <a className={styles.liveButton} href="#live">
               <span className={styles.liveDot} aria-hidden="true" />
               ดูตำแหน่งสด
               <span aria-hidden="true">→</span>
-            </Link>
+            </a>
             <button className={styles.ghostButton} type="button" onClick={() => window.print()}>
               พิมพ์ / บันทึก
             </button>
           </div>
         </header>
+
+        <TripLiveStatus />
 
         <section className={styles.block}>
           <SectionHead index="01" eyebrow="Route rules" title="กฎ 3 ข้อของทริปนี้" />
