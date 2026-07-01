@@ -1,12 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import {
-  WEATHER_FORECAST_DATE,
+  WEATHER_FORECAST_DATES,
   WEATHER_FORECAST_MAX_DAYS,
   describeWeather,
   fetchStopsForecast,
+  formatThaiShortDate,
   pickForecastAtHour,
   type ForecastWeather,
   type HourlySeries,
@@ -68,6 +70,8 @@ const FORECAST_POINTS = TIMED_STOPS.map((stop) => ({
   lon: stop.coords[1],
 }));
 const DAY_MS = 24 * 60 * 60 * 1_000;
+const WEATHER_START_DATE = WEATHER_FORECAST_DATES[0];
+const WEATHER_END_DATE = WEATHER_FORECAST_DATES[WEATHER_FORECAST_DATES.length - 1];
 
 const TAG_ACCENT = new Set(["Start", "เติมเต็มถัง", "สำคัญ", "ก่อนเข้าเมือง", "Finish"]);
 const TAG_REST = new Set(["Day run", "พักคน", "พักรถ", "พักสั้น", "Breakfast", "Lunch"]);
@@ -119,20 +123,44 @@ function SectionHead({
 function RouteWeatherSummary({
   state,
   forecasts,
+  selectedDate,
+  onSelectDate,
 }: {
   state: ForecastState;
   forecasts: Array<ForecastWeather | null>;
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
 }) {
-  const summary = summarizeRouteWeather(state, forecasts);
+  const dateLabel = formatThaiShortDate(selectedDate);
+  const summary = summarizeRouteWeather(state, forecasts, dateLabel);
 
   return (
     <section className={cx(styles.weatherSummary, summary.tone ? weatherToneClass(summary.tone) : null)} aria-live="polite">
       <div className={styles.weatherSummaryTop}>
         <span className={styles.weatherSummaryLabel}>สภาพอากาศทริป</span>
-        <span className={styles.weatherSummaryDate}>13 ก.ค.</span>
+        <span className={styles.weatherSummaryDate}>{dateLabel}</span>
       </div>
       <p className={styles.weatherSummaryTitle}>{summary.title}</p>
       <p className={styles.weatherSummaryMeta}>{summary.meta}</p>
+
+      <div className={styles.weatherDates} role="group" aria-label="เลือกวันพยากรณ์อากาศ">
+        <span className={styles.weatherDatesLabel}>เลือกวัน</span>
+        {WEATHER_FORECAST_DATES.map((dateKey) => {
+          const active = dateKey === selectedDate;
+
+          return (
+            <button
+              key={dateKey}
+              type="button"
+              className={cx(styles.weatherDate, active ? styles.weatherDateActive : null)}
+              aria-pressed={active}
+              onClick={() => onSelectDate(dateKey)}
+            >
+              {formatThaiShortDate(dateKey)}
+            </button>
+          );
+        })}
+      </div>
     </section>
   );
 }
@@ -263,15 +291,18 @@ function StopRow({
 
 export function Trip01Client({ fontClassName }: { fontClassName: string }) {
   const [forecastState, setForecastState] = useState<ForecastState>(() => initialForecastState());
+  const [selectedDate, setSelectedDate] = useState<string>(WEATHER_START_DATE);
 
   useEffect(() => {
-    if (!isForecastDateInRange(new Date())) {
+    if (!isForecastRangeInRange(new Date())) {
       return undefined;
     }
 
     const controller = new AbortController();
 
-    void fetchStopsForecast(FORECAST_POINTS, WEATHER_FORECAST_DATE, controller.signal)
+    // One request covers every selectable day for all stops; the picker just
+    // reslices the same hourly series client-side.
+    void fetchStopsForecast(FORECAST_POINTS, WEATHER_START_DATE, WEATHER_END_DATE, controller.signal)
       .then((series) => setForecastState({ status: "ready", series }))
       .catch((error) => {
         if (isAbortError(error)) {
@@ -292,9 +323,9 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
     return TIMED_STOPS.map((stop, index) => {
       const series = forecastState.series[index];
 
-      return series ? pickForecastAtHour(series, stop.arrive) : null;
+      return series ? pickForecastAtHour(series, stop.arrive, selectedDate) : null;
     });
-  }, [forecastState]);
+  }, [forecastState, selectedDate]);
 
   return (
     <main className={cx(styles.tripRoot, fontClassName)}>
@@ -339,12 +370,22 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             </div>
           </dl>
 
-          <RouteWeatherSummary state={forecastState} forecasts={stopForecasts} />
+          <RouteWeatherSummary
+            state={forecastState}
+            forecasts={stopForecasts}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+          />
 
           <div className={styles.heroActions}>
             <a className={styles.primaryButton} href="#stops">
               ไปที่ไทม์ไลน์ ↓
             </a>
+            <Link className={styles.liveButton} href="/trip/001/live">
+              <span className={styles.liveDot} aria-hidden="true" />
+              ดูตำแหน่งสด
+              <span aria-hidden="true">→</span>
+            </Link>
             <button className={styles.ghostButton} type="button" onClick={() => window.print()}>
               พิมพ์ / บันทึก
             </button>
@@ -485,11 +526,12 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
 
 function summarizeRouteWeather(
   state: ForecastState,
-  forecasts: Array<ForecastWeather | null>
+  forecasts: Array<ForecastWeather | null>,
+  dateLabel: string
 ): { title: string; meta: string; tone: WeatherTone | null } {
   if (state.status === "loading") {
     return {
-      title: "13 ก.ค. · กำลังโหลดพยากรณ์ตามเวลาถึง",
+      title: `${dateLabel} · กำลังโหลดพยากรณ์ตามเวลาถึง`,
       meta: "เรียก Open-Meteo หนึ่งครั้งสำหรับ 10 จุดพัก",
       tone: null,
     };
@@ -497,7 +539,7 @@ function summarizeRouteWeather(
 
   if (state.status === "error") {
     return {
-      title: "13 ก.ค. · เปิดพยากรณ์ไม่ได้ตอนนี้",
+      title: `${dateLabel} · เปิดพยากรณ์ไม่ได้ตอนนี้`,
       meta: "ข้ามข้อมูลอากาศไว้ก่อน แผนจุดพักยังใช้ได้ตามเดิม",
       tone: null,
     };
@@ -505,7 +547,7 @@ function summarizeRouteWeather(
 
   if (state.status === "out-of-range") {
     return {
-      title: "13 ก.ค. · ยังไม่มีข้อมูลพยากรณ์",
+      title: `${dateLabel} · ยังไม่มีข้อมูลพยากรณ์`,
       meta: "ยังไม่มีข้อมูลพยากรณ์ / ใกล้วันเดินทางจะแม่นขึ้น",
       tone: null,
     };
@@ -516,14 +558,14 @@ function summarizeRouteWeather(
 
   if (!dominant || !rainiest) {
     return {
-      title: "13 ก.ค. · ยังไม่มีข้อมูลชั่วโมงเวลาถึง",
+      title: `${dateLabel} · ยังไม่มีข้อมูลชั่วโมงเวลาถึง`,
       meta: "Open-Meteo ตอบกลับแล้ว แต่ข้อมูลรายชั่วโมงไม่ครบสำหรับจุดพัก",
       tone: null,
     };
   }
 
   return {
-    title: `13 ก.ค. · ส่วนใหญ่ ${dominant.label}`,
+    title: `${dateLabel} · ส่วนใหญ่ ${dominant.label}`,
     meta: `ฝนสูงสุด ${Math.round(rainiest.forecast.precipProb)}% แถว ${rainiest.stop.name}`,
     tone: dominant.tone,
   };
@@ -592,9 +634,9 @@ function weatherToneClass(tone: WeatherTone): string {
   }
 }
 
-function isForecastDateInRange(now: Date): boolean {
+function isForecastDateInRange(now: Date, dateKey: string): boolean {
   const todayMs = dateKeyToUtcMs(bangkokDateKey(now));
-  const forecastMs = dateKeyToUtcMs(WEATHER_FORECAST_DATE);
+  const forecastMs = dateKeyToUtcMs(dateKey);
 
   if (todayMs === null || forecastMs === null) {
     return false;
@@ -605,8 +647,13 @@ function isForecastDateInRange(now: Date): boolean {
   return diffDays >= 0 && diffDays <= WEATHER_FORECAST_MAX_DAYS;
 }
 
+// Worth fetching as long as any selectable day still falls in the forecast window.
+function isForecastRangeInRange(now: Date): boolean {
+  return WEATHER_FORECAST_DATES.some((dateKey) => isForecastDateInRange(now, dateKey));
+}
+
 function initialForecastState(): ForecastState {
-  return isForecastDateInRange(new Date()) ? { status: "loading" } : { status: "out-of-range" };
+  return isForecastRangeInRange(new Date()) ? { status: "loading" } : { status: "out-of-range" };
 }
 
 function bangkokDateKey(date: Date): string {

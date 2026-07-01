@@ -1,5 +1,26 @@
-export const WEATHER_FORECAST_DATE = "2026-07-13" as const;
+// Trip departure day + the following days — all selectable on the roadbook.
+export const WEATHER_FORECAST_DATES = ["2026-07-13", "2026-07-14", "2026-07-15", "2026-07-16"] as const;
+export const WEATHER_FORECAST_DATE = WEATHER_FORECAST_DATES[0];
 export const WEATHER_FORECAST_MAX_DAYS = 16;
+
+const THAI_MONTHS_ABBR = [
+  "ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.",
+  "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค.",
+] as const;
+
+// "2026-07-13" → "13 ก.ค."
+export function formatThaiShortDate(dateKey: string): string {
+  const parts = dateKey.split("-");
+  const month = Number(parts[1]);
+  const day = Number(parts[2]);
+  const abbr = Number.isInteger(month) ? THAI_MONTHS_ABBR[month - 1] : undefined;
+
+  if (!Number.isInteger(day) || !abbr) {
+    return dateKey;
+  }
+
+  return `${day} ${abbr}`;
+}
 
 const OPEN_METEO_FORECAST_ENDPOINT = "https://api.open-meteo.com/v1/forecast";
 const CURRENT_FIELDS = [
@@ -96,7 +117,8 @@ export async function fetchCurrentWeather(
 
 export async function fetchStopsForecast(
   points: readonly ForecastPoint[],
-  date: typeof WEATHER_FORECAST_DATE,
+  startDate: string,
+  endDate: string,
   signal?: AbortSignal
 ): Promise<HourlySeries[]> {
   for (const point of points) {
@@ -112,8 +134,8 @@ export async function fetchStopsForecast(
       latitude: points.map((point) => formatCoordinate(point.lat)).join(","),
       longitude: points.map((point) => formatCoordinate(point.lon)).join(","),
       hourly: HOURLY_FIELDS.join(","),
-      start_date: date,
-      end_date: date,
+      start_date: startDate,
+      end_date: endDate,
       timezone: "Asia/Bangkok",
     }),
     {
@@ -141,14 +163,18 @@ export async function fetchStopsForecast(
   });
 }
 
-export function pickForecastAtHour(series: HourlySeries, hhmm: string): ForecastWeather | null {
+export function pickForecastAtHour(
+  series: HourlySeries,
+  hhmm: string,
+  dateKey?: string
+): ForecastWeather | null {
   const targetMinutes = roundHHMMToHourMinutes(hhmm);
 
   if (targetMinutes === null) {
     return null;
   }
 
-  const index = findHourlyIndex(series.time, targetMinutes);
+  const index = findHourlyIndex(series.time, targetMinutes, dateKey);
 
   if (index === null) {
     return null;
@@ -387,13 +413,21 @@ function roundHHMMToHourMinutes(hhmm: string): number | null {
   return rounded >= MINUTES_PER_DAY ? null : rounded;
 }
 
-function findHourlyIndex(times: readonly string[], targetMinutes: number): number | null {
+function findHourlyIndex(
+  times: readonly string[],
+  targetMinutes: number,
+  dateKey?: string
+): number | null {
   let matchedIndex: number | null = null;
 
   for (let index = 0; index < times.length; index += 1) {
     const time = times[index];
 
     if (time === undefined) {
+      continue;
+    }
+
+    if (dateKey && !time.startsWith(`${dateKey}T`)) {
       continue;
     }
 

@@ -243,6 +243,58 @@
   line-height: 1.55;
 }
 
+/* Day picker — reslices every stop's forecast to the chosen date */
+.weatherDates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.weatherDatesLabel {
+  margin-right: 3px;
+  font-family: var(--trip-mono);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.weatherDate {
+  font-family: var(--trip-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card);
+  padding: 5px 12px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.weatherDate:hover {
+  color: var(--accent-deep);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.weatherDateActive,
+.weatherDateActive:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--card);
+  box-shadow: var(--shadow-soft);
+  transform: none;
+}
+
 .heroActions {
   display: flex;
   flex-wrap: wrap;
@@ -291,6 +343,69 @@
 .ghostButton:hover {
   border-color: var(--ink);
   background: var(--card-2);
+}
+
+/* "View live location" → /trip/001/live (go-green, distinct from the plan CTAs) */
+.liveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border-radius: 11px;
+  border: 1.5px solid var(--rest);
+  padding: 0 18px;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--rest);
+  background: var(--rest-tint);
+  touch-action: manipulation;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 120ms ease;
+}
+
+.liveButton:hover {
+  background: var(--rest);
+  color: #fff6f0;
+}
+
+.liveButton:hover .liveDot {
+  background: #fff6f0;
+}
+
+.liveButton:active {
+  transform: translateY(1px);
+}
+
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--rest);
+  animation: livepulse 1.8s ease-out infinite;
+}
+
+@keyframes livepulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(47, 107, 65, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(47, 107, 65, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(47, 107, 65, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot {
+    animation: none;
+  }
 }
 
 .primaryButton:active,
