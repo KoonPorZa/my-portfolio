@@ -11,6 +11,7 @@ import {
   useMap,
 } from "@/components/ui/map";
 import { stops } from "@/lib/trip-stops";
+import { ROUTE_ROAD_GEOMETRY } from "@/lib/trip-route-geometry";
 import styles from "./route-map.module.css";
 
 // mapcn's default free CARTO basemap (no API key). Positron is a light style
@@ -19,6 +20,8 @@ const CARTO_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.js
 const ROUTE_COLOR = "#cf451c";
 
 // trip-stops stores coords as [lat, lng]; MapLibre / GeoJSON expect [lng, lat].
+// Used only for the stop markers and the initial fit — the drawn line follows
+// real roads via ROUTE_ROAD_GEOMETRY below.
 const routeCoords: [number, number][] = stops.map(({ coords }) => [coords[1], coords[0]]);
 
 type LivePoint = { lat: number; lng: number } | null;
@@ -64,7 +67,7 @@ export function RouteMapImpl({ live }: { live: LivePoint }) {
     >
       <FitToRoute live={live} />
 
-      <MapRoute coordinates={routeCoords} color={ROUTE_COLOR} width={3.5} opacity={0.92} />
+      <MapRoute coordinates={ROUTE_ROAD_GEOMETRY} color={ROUTE_COLOR} width={3.5} opacity={0.92} />
 
       {stops.map((stop, index) => {
         const major = index === 0 || index === stops.length - 1;
