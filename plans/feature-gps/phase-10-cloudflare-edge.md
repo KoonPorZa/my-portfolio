@@ -42,7 +42,9 @@ the auth boundary.**
    Settings → Domains & Routes → Add → Custom Domain (no manual A/CNAME needed;
    Cloudflare handles the orange-cloud proxy automatically). CDN/edge caching is
    inherent because the Worker runs on Cloudflare's edge. Set `api.koonporza.com`
-   to **Proxied** in front of the Fastify backend host. Keep verification/TXT records
+   as a CNAME to the **Railway backend** (see `DEPLOY.md` §3; add the domain in
+   Railway first so it issues SSL, then keep DNS-only or switch to Proxied + SSL
+   Full). Keep verification/TXT records
    **DNS-only**. SSL/TLS = **Full (Strict)** once the origins are ready.
    Do **not** cache `/api/trips/001/*` or `/trip/001/live*`; cache only safe static assets.
 2. **WAF + Rate limiting:** scope rules to `/api/trips/001/location*` + the session endpoint (+ optional

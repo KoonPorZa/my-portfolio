@@ -4,10 +4,11 @@ Two deployables in this monorepo:
 
 - **`apps/web`** — Next.js 16 frontend → **Cloudflare Workers** (via the
   [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter).
-- **`apps/api`** — Fastify GPS backend → a **Docker container on `por-dev`**,
-  deployed with one command from your machine (`deploy/trip-gps-api/deploy.sh`,
-  see §3). Fastify needs a long-running Node server, so it does **not** run on
-  Workers. Cloudflare sits in front of it (see Phase 10).
+- **`apps/api`** — Fastify GPS backend → **Railway** (Docker deploy from
+  `apps/api/Dockerfile`, see §3). It reads Railway's injected `PORT` and binds
+  `0.0.0.0`, so it runs on Railway as-is. Fastify needs a long-running Node
+  server, so it does **not** run on Workers. Cloudflare fronts it at
+  `api.koonporza.com` (see Phase 10).
 
 > Why Workers and not "Cloudflare Pages"? For a Next.js app with SSR + Node
 > route handlers, Cloudflare's current, documented path is **Workers + OpenNext**.
@@ -77,68 +78,73 @@ npm run deploy -w web       # = opennextjs-cloudflare build && wrangler deploy
 `wrangler` will prompt you to log in to Cloudflare on first run. To preview the
 Workers runtime locally before deploying: `npm run preview -w web`.
 
-## 3. Deploy `apps/api` (GPS backend)
+## 3. Deploy `apps/api` (GPS backend) → Railway
 
-The Fastify API runs as a Docker container on **`por-dev`** (linux/amd64),
-fronted by Nginx Proxy Manager at `api.koonporza.com`. Deploy it with one command
-**from your machine**:
+The Fastify API deploys to **Railway** as a Docker service built from
+`apps/api/Dockerfile`. It's Railway-ready as-is: it reads Railway's injected
+`PORT` and binds `0.0.0.0` (`apps/api/src/server.ts`).
 
-```bash
-./deploy/trip-gps-api/deploy.sh
+### Build config (monorepo + Dockerfile)
+
+The Dockerfile builds from the **repo root** (it needs the root
+`package-lock.json` + both workspace manifests), so keep the **full repo
+context** — do **not** set a restrictive Root Directory. The committed
+`railway.json` points Railway at the Dockerfile:
+
+```json
+{ "build": { "builder": "DOCKERFILE", "dockerfilePath": "apps/api/Dockerfile" } }
 ```
 
-Because `por-dev` is amd64 and your machine may be arm64, the script **builds on
-the server** (no cross-arch juggling, no registry). It:
+(Equivalent CLI: `railway environment edit --service-config <service>
+build.builder DOCKERFILE` + `... build.dockerfilePath apps/api/Dockerfile`.)
 
-1. `rsync`s the source to `por-dev` (excluding `node_modules`, `.git`, `.env*`);
-2. ships `deploy/trip-gps-api/compose.yml` and `apps/api/.env.prod` (as the
-   container's server-local `.env`);
-3. runs `docker build` + `docker compose up -d` on `por-dev`;
-4. health-checks `/health`.
+### First deploy
 
-Override the target with `DEPLOY_SSH_HOST=` / `DEPLOY_DIR=` if needed.
+```bash
+# from the repo root — signs you in if needed, creates the project + service,
+# builds the Dockerfile, and deploys:
+railway up -m "trip-gps-api initial deploy"
+```
 
-### Prerequisites (one-time)
+`railway up --detach` returns at QUEUED — confirm with `railway deployment list
+--json` (status `SUCCESS`) before trusting it. Or connect the GitHub repo in the
+Railway dashboard for auto-deploy on push. Redeploy after changes with
+`railway up -m "<summary>"`.
 
-- **SSH access** to `por-dev` through the jump host. Add an alias to
-  `~/.ssh/config` so `ssh por-dev` works:
+### Environment variables (Railway → service → Variables)
 
-  ```
-  Host por-jump
-    HostName <jump-host>
-    User <jump-user>
+Set these (full reference: `docs/env-doc.md`). **Do NOT set `PORT`** — Railway
+injects it and the app reads it.
 
-  Host por-dev
-    HostName 192.168.248.17
-    User dev
-    ProxyJump por-jump
-  ```
+```
+NODE_ENV=production
+TRIP_GPS_ENABLED=1
+TRIP_GPS_STORE=supabase
+TRIP_GPS_SUPABASE_URL=https://<ref>.supabase.co
+TRIP_GPS_SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+TRIP_GPS_OWNER_CODE=<owner-code>
+CORS_ORIGINS=https://koonporza.com,https://www.koonporza.com
+```
 
-- **Docker + Docker Compose** on `por-dev`, plus the external Docker network
-  `nginx-proxy-manager_default` (created by the Nginx Proxy Manager stack).
-- **`apps/api/.env.prod`** filled in — gitignored, created from
-  `apps/api/.env.example`. `TRIP_GPS_OWNER_CODE` is required; keep `PORT=3000`
-  and start with `TRIP_GPS_STORE=memory` until Supabase creds are set. The script
-  refuses to deploy while required values are empty or still placeholders.
+```bash
+railway variable set NODE_ENV=production TRIP_GPS_ENABLED=1 --service <service>
+# …or paste them in the dashboard. The values are in your apps/api/.env.prod.
+```
 
-### Fixed facts (keep aligned)
+### Custom domain `api.koonporza.com`
 
-- **Networking:** the API attaches to the external network
-  `nginx-proxy-manager_default`.
-- **Port:** `expose: "3000"` only (no host `ports`). `PORT` must be `3000` so the
-  NPM target `trip-gps-api:3000`, the `EXPOSE`, and the healthcheck all match.
-- **Secrets:** live only in `apps/api/.env.prod` locally and the server-local
-  `.env` — never committed (both matched by the `.env*` gitignore rule).
+1. Railway → service → **Settings → Networking → Custom Domain** →
+   `api.koonporza.com`. Railway shows a `CNAME` target (`<id>.up.railway.app`)
+   and issues SSL automatically.
+2. Cloudflare → DNS → **CNAME** `api.koonporza.com` → that Railway target.
+   Simplest is **DNS-only (grey)** so Railway validates + serves TLS. To keep
+   Cloudflare's proxy/WAF (Phase 10), add the domain in Railway first, let it
+   issue the cert, then switch the record to **Proxied** with SSL mode **Full**.
+3. Verify `https://api.koonporza.com/health` → `{"status":"ok"}`.
 
-### After the first deploy (owner, in Nginx Proxy Manager)
-
-Create a proxy host for `api.koonporza.com` → `trip-gps-api:3000` on the
-`nginx-proxy-manager_default` network, enable SSL, keep the Cloudflare DNS record
-proxied, and verify `https://api.koonporza.com/health`.
-
-> **Warning:** `por-dev` already has services bound to public ports, including
-> Redis on `6379`. Before using it as a public production host, restrict public
-> access to unrelated services with firewall rules or Docker network changes.
+> The earlier self-host path (build on `por-dev` via
+> `deploy/trip-gps-api/deploy.sh` + `compose.yml`) is superseded by Railway; the
+> scripts remain in the repo as an optional fallback.
 
 ## 4. Environment variables
 
@@ -154,10 +160,10 @@ Full reference (Thai): `docs/env-doc.md`. Quick summary:
     `NEXT_PUBLIC_TRIP_GPS_API_BASE` set, those routes are dormant. Set runtime
     secrets with `npm exec -w web -- wrangler secret put <NAME>` (or in the
     dashboard) — never commit them.
-- **Backend (`apps/api`) — set in `apps/api/.env.prod`** (gitignored; shipped to
-  `por-dev` as the container's `.env` by `deploy.sh`): `CORS_ORIGINS`,
+- **Backend (`apps/api`) — set in Railway** (service → Variables): `CORS_ORIGINS`,
   `TRIP_GPS_ENABLED`, `TRIP_GPS_STORE`, `TRIP_GPS_SUPABASE_*`,
-  `TRIP_GPS_OWNER_CODE`. Template: `apps/api/.env.example`.
+  `TRIP_GPS_OWNER_CODE`. **Do NOT set `PORT`** — Railway injects it and the app
+  reads it. Reference values: `apps/api/.env.example` / your `apps/api/.env.prod`.
 
 ## 5. Custom domain koonporza.com
 
@@ -166,8 +172,8 @@ A/CNAME records, and the route is proxied/orange-cloud automatically):
 
 1. Cloudflare → your Worker (`portfolio-koonporza-web`) → **Settings → Domains &
    Routes → Add → Custom Domain** → `koonporza.com` (and `www`).
-2. Point `api.koonporza.com` at the Fastify backend host and set it to
-   **Proxied** (see `plans/feature-gps/phase-10-cloudflare-edge.md`).
+2. `api.koonporza.com` points at the Railway backend — see §3's custom-domain
+   step (add it in Railway, CNAME it in Cloudflare).
 3. SSL is issued automatically (usually minutes).
 
 ## 6. Before going live

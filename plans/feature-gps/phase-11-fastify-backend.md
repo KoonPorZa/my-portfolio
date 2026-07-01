@@ -152,8 +152,8 @@ The repository layer must upsert `trip_location_latest` and append
 Deploy the backend separately from the frontend.
 
 - Frontend: **Cloudflare Workers** (via `@opennextjs/cloudflare`) — see `DEPLOY.md`.
-- Backend: Railway first, Render if a more predictable always-on service is
-  preferred, or Fly.io if Docker and regional control are worth the extra ops.
+- Backend: **Railway** — Docker deploy from `apps/api/Dockerfile` (repo-root
+  `railway.json` points Railway at it). See `DEPLOY.md` §3.
 - Database: Supabase Postgres.
 - Domain: point `api.koonporza.com` to the backend service.
 
@@ -175,7 +175,7 @@ causes unacceptable cold starts, document the impact and ask before upgrading.
    instead of relative Next API routes.
 8. Add focused tests for token hashing, payload validation, freshness state,
    invalid token behavior, and too-frequent upload rejection.
-9. Add deployment notes for Railway, Render, or Fly.io after the host is chosen.
+9. Railway deployment notes: `DEPLOY.md` §3 + committed `railway.json`.
 
 ## Acceptance criteria
 

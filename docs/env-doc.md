@@ -2,7 +2,7 @@
 
 สรุป environment variables ของ repo นี้ และ **แต่ละค่าต้องเอามาจากไหน**. แยกตาม
 service: `apps/web` (Next.js frontend, deploy บน **Cloudflare Workers**) และ
-`apps/api` (Fastify backend, deploy บน Node host เช่น Railway / Render / Fly.io).
+`apps/api` (Fastify backend, deploy บน **Railway** แบบ Docker).
 
 ค่า secret ต้องอยู่ฝั่ง server / backend host เท่านั้น — **ห้ามใส่ secret ใน
 `NEXT_PUBLIC_*`** เพราะค่าพวกนั้นถูก inline ลง browser bundle.
@@ -14,7 +14,7 @@ Template: `apps/web/.env.example` และ `apps/api/.env.example`.
 | ที่ | ตั้งยังไง |
 | --- | --- |
 | Frontend production (Cloudflare Workers) | **`NEXT_PUBLIC_*`** = Workers Builds → **Build variables** (ต้องมีตอน build เพราะ Next inline เข้า bundle). ค่าฝั่ง server (`GITHUB_TOKEN`, `YOUTUBE_API_KEY`, GPS fallback) = Worker → **Settings → Variables and Secrets** (อ่านตอน run เช่น ISR / route handler); ความลับใช้ `wrangler secret put <NAME>` |
-| Backend production (Node host) | ตั้งใน dashboard ของ host (Railway/Render/Fly) |
+| Backend production (Railway) | ตั้งใน **Railway → service → Variables** (อย่าตั้ง `PORT` — Railway inject ให้เอง แล้ว app อ่านค่าเอง) |
 | Local frontend | `apps/web/.env.local` (copy จาก `.env.example`) |
 | Local backend | `apps/api/.env` (copy จาก `.env.example`) |
 

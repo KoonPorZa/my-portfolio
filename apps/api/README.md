@@ -43,10 +43,8 @@ Deploy this package as a separate backend service from the Next.js frontend.
 Set the frontend `NEXT_PUBLIC_TRIP_GPS_API_BASE` to the public backend origin,
 for example `https://api.koonporza.com`.
 
-Railway, Render, and Fly.io can all run this service. Use the Dockerfile when
-the host supports Docker, or run `npm run build` followed by `npm start` when
-the host builds Node packages directly.
+Deploy to **Railway** using the Dockerfile — the repo-root `railway.json` points
+Railway at `apps/api/Dockerfile`. Railway injects `PORT` and the app reads it.
+See `DEPLOY.md` §3 for the full flow (build config, variables, custom domain).
 
-Free tiers may sleep or cold-start. Do not add a paid plan without asking first.
-If cold starts become a real trip risk, document the impact and decide on the
-hosting plan before upgrading.
+Do not add a paid plan without asking first.
