@@ -4,8 +4,9 @@ Two deployables in this monorepo:
 
 - **`apps/web`** — Next.js 16 frontend → **Cloudflare Workers** (via the
   [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter).
-- **`apps/api`** — Fastify GPS backend → a **Node host** (Railway / Render /
-  Fly.io). Fastify needs a long-running Node server, so it does **not** run on
+- **`apps/api`** — Fastify GPS backend → a **Docker container on `por-dev`**,
+  deployed with one command from your machine (`deploy/trip-gps-api/deploy.sh`,
+  see §3). Fastify needs a long-running Node server, so it does **not** run on
   Workers. Cloudflare sits in front of it (see Phase 10).
 
 > Why Workers and not "Cloudflare Pages"? For a Next.js app with SSR + Node
@@ -78,18 +79,66 @@ Workers runtime locally before deploying: `npm run preview -w web`.
 
 ## 3. Deploy `apps/api` (GPS backend)
 
-Deploy `apps/api` separately to a Node host (Railway / Render / Fly.io). A
-`Dockerfile` is included for hosts that prefer containers. Free tiers can
-cold-start, which is acceptable for the MVP — do not add a paid plan without
-asking first.
+The Fastify API runs as a Docker container on **`por-dev`** (linux/amd64),
+fronted by Nginx Proxy Manager at `api.koonporza.com`. Deploy it with one command
+**from your machine**:
 
-Set backend env in the host (start from `apps/api/.env.example`), and include
-`CORS_ORIGINS` with the deployed frontend origin(s), e.g.
-`https://koonporza.com,https://www.koonporza.com`.
+```bash
+./deploy/trip-gps-api/deploy.sh
+```
 
-> Optional: Cloudflare **Containers** can run the included `apps/api/Dockerfile`
-> if you want the backend on Cloudflare too. Not required for the MVP; the
-> Node-host + Cloudflare-proxy path above is simpler and already planned.
+Because `por-dev` is amd64 and your machine may be arm64, the script **builds on
+the server** (no cross-arch juggling, no registry). It:
+
+1. `rsync`s the source to `por-dev` (excluding `node_modules`, `.git`, `.env*`);
+2. ships `deploy/trip-gps-api/compose.yml` and `apps/api/.env.prod` (as the
+   container's server-local `.env`);
+3. runs `docker build` + `docker compose up -d` on `por-dev`;
+4. health-checks `/health`.
+
+Override the target with `DEPLOY_SSH_HOST=` / `DEPLOY_DIR=` if needed.
+
+### Prerequisites (one-time)
+
+- **SSH access** to `por-dev` through the jump host. Add an alias to
+  `~/.ssh/config` so `ssh por-dev` works:
+
+  ```
+  Host por-jump
+    HostName <jump-host>
+    User <jump-user>
+
+  Host por-dev
+    HostName 192.168.248.17
+    User dev
+    ProxyJump por-jump
+  ```
+
+- **Docker + Docker Compose** on `por-dev`, plus the external Docker network
+  `nginx-proxy-manager_default` (created by the Nginx Proxy Manager stack).
+- **`apps/api/.env.prod`** filled in — gitignored, created from
+  `apps/api/.env.example`. `TRIP_GPS_OWNER_CODE` is required; keep `PORT=3000`
+  and start with `TRIP_GPS_STORE=memory` until Supabase creds are set. The script
+  refuses to deploy while required values are empty or still placeholders.
+
+### Fixed facts (keep aligned)
+
+- **Networking:** the API attaches to the external network
+  `nginx-proxy-manager_default`.
+- **Port:** `expose: "3000"` only (no host `ports`). `PORT` must be `3000` so the
+  NPM target `trip-gps-api:3000`, the `EXPOSE`, and the healthcheck all match.
+- **Secrets:** live only in `apps/api/.env.prod` locally and the server-local
+  `.env` — never committed (both matched by the `.env*` gitignore rule).
+
+### After the first deploy (owner, in Nginx Proxy Manager)
+
+Create a proxy host for `api.koonporza.com` → `trip-gps-api:3000` on the
+`nginx-proxy-manager_default` network, enable SSL, keep the Cloudflare DNS record
+proxied, and verify `https://api.koonporza.com/health`.
+
+> **Warning:** `por-dev` already has services bound to public ports, including
+> Redis on `6379`. Before using it as a public production host, restrict public
+> access to unrelated services with firewall rules or Docker network changes.
 
 ## 4. Environment variables
 
@@ -105,9 +154,10 @@ Full reference (Thai): `docs/env-doc.md`. Quick summary:
     `NEXT_PUBLIC_TRIP_GPS_API_BASE` set, those routes are dormant. Set runtime
     secrets with `npm exec -w web -- wrangler secret put <NAME>` (or in the
     dashboard) — never commit them.
-- **Backend (`apps/api`) — set on the Node host:** `CORS_ORIGINS`,
+- **Backend (`apps/api`) — set in `apps/api/.env.prod`** (gitignored; shipped to
+  `por-dev` as the container's `.env` by `deploy.sh`): `CORS_ORIGINS`,
   `TRIP_GPS_ENABLED`, `TRIP_GPS_STORE`, `TRIP_GPS_SUPABASE_*`,
-  `TRIP_GPS_OWNER_CODE`. See `apps/api/.env.example`.
+  `TRIP_GPS_OWNER_CODE`. Template: `apps/api/.env.example`.
 
 ## 5. Custom domain koonporza.com
 
