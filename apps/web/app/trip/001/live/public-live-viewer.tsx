@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { WeatherNow } from "@/components/weather-now";
 import { buildTimedStops } from "@/lib/trip-stops";
 import { useLiveLocation } from "@/lib/trip-gps/use-live-location";
+import { TripRouteMap } from "./route-map";
 import styles from "./live.module.css";
 
 const routeStops = buildTimedStops();
@@ -117,6 +118,16 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
             </div>
           </div>
           <p className={styles.stateCopy}>{copy.body}</p>
+        </section>
+
+        <section className={styles.routePanel} aria-labelledby="route-map-title">
+          <header className={styles.routeHeader}>
+            <div>
+              <p className={styles.eyebrow}>Route map</p>
+              <h2 id="route-map-title">แผนที่เส้นทาง</h2>
+            </div>
+          </header>
+          <TripRouteMap live={live ? { lat: live.lat, lng: live.lng } : null} />
         </section>
 
         <div className={styles.locationGrid}>

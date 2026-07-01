@@ -14,6 +14,7 @@ import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import { WeatherNow } from "@/components/weather-now";
 import { buildTimedStops } from "@/lib/trip-stops";
 import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
+import { TripRouteMap } from "./route-map";
 import styles from "./live.module.css";
 
 type ViewerLatestResponse = {
@@ -264,6 +265,16 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
           </dl>
 
           {errorMessage ? <p className={styles.errorLine}>{errorMessage}</p> : null}
+        </section>
+
+        <section className={styles.routePanel} aria-labelledby="route-map-title">
+          <header className={styles.routeHeader}>
+            <div>
+              <p className={styles.eyebrow}>Route map</p>
+              <h2 id="route-map-title">แผนที่เส้นทาง</h2>
+            </div>
+          </header>
+          <TripRouteMap live={latest ? { lat: latest.lat, lng: latest.lng } : null} />
         </section>
 
         <div className={styles.locationGrid}>

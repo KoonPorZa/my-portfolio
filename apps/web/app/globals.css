@@ -14,6 +14,19 @@
   --color-cyan: #2ff3ff;
   --color-magenta: #ff2e97;
   --color-lime: #b4f53c;
+
+  /* shadcn-lite tokens consumed ONLY by the vendored mapcn map
+     (components/ui/map.tsx). Themed to the trip roadbook light palette so the
+     map controls / popups feel native. Unused by the rest of the site. */
+  --color-background: #fbf6ec;
+  --color-foreground: #211b13;
+  --color-popover: #fbf6ec;
+  --color-popover-foreground: #211b13;
+  --color-muted: #ece1cc;
+  --color-muted-foreground: #8c7d63;
+  --color-accent: #fae4d8;
+  --color-border: #cdbd9c;
+  --color-ring: #cf451c;
 }
 
 /* Fonts use `inline` so the next/font CSS var resolves on the utility directly */
