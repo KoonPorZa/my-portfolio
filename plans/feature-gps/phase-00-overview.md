@@ -105,8 +105,14 @@ work must follow Phase 11.
 | `phase-09-native-spike.md` | Native tracker spike | Future | (gated by MVP results) |
 | `phase-10-cloudflare-edge.md` | Cloudflare edge layer (DNS/WAF/analytics) | P1 | 11, 06 + deploy |
 | `phase-11-fastify-backend.md` | Fastify backend service | P1 | 03 |
+| `phase-12-weather.md` | Weather (Open-Meteo) on live + roadbook | P2 | 06, 11 |
+| `phase-13-progress.md` | Planned vs actual stop timeline | P2 | 11, 06, 02 |
+| `phase-14-api-hardening.md` | Rate-limit hardening + bot/abuse guard | P1 | 11 |
+| `phase-15-actual-track-timeline.md` | Actual track polyline + arrival timeline v2 | P2 | 13, 11 |
+| `phase-16-observability.md` | Observability & ops (health/logs/errors) | P2 | 11 |
 
 **Suggested order:** 01 → 03 → 02 → 11 → 07 → 06 → 08 → (09 only if needed).
+**Post-MVP hardening/ops:** 14 (API hardening, P1 — do early, owner-code brute-force guard) → 15 (actual track + arrival timeline) → 16 (observability).
 Phase 10 (Cloudflare edge) is **mostly Cloudflare-dashboard config done at deploy time** — its only
 repo code (Fastify API `no-store` headers + a privacy-safe analytics beacon) can land any time after 11/06.
 P0–P1 = shippable MVP. P2 = hardening. Future = optional. Cloudflare = edge defense-in-depth, **not** auth.
