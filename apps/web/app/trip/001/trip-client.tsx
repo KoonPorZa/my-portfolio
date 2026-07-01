@@ -381,14 +381,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <a className={styles.primaryButton} href="#stops">
               ไปที่ไทม์ไลน์ ↓
             </a>
-            <a
-              className={styles.liveButton}
-              href="#live"
-              onClick={(event) => {
-                event.preventDefault();
-                document.getElementById("live")?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-            >
+            <a className={styles.liveButton} href="/trip/001/live">
               <span className={styles.liveDot} aria-hidden="true" />
               ดูตำแหน่งสด
               <span aria-hidden="true">→</span>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans_Thai } from "next/font/google";
 import { LiveViewer } from "./live-viewer";
+import { PublicLiveViewer } from "./public-live-viewer";
 
 const sans = IBM_Plex_Sans_Thai({
   subsets: ["thai", "latin"],
@@ -37,8 +38,15 @@ export default async function Trip01LivePage({
 }) {
   const { t } = await searchParams;
   const token = normalizeToken(t);
+  const fontClassName = `${sans.variable} ${mono.variable}`;
 
-  return <LiveViewer token={token} fontClassName={`${sans.variable} ${mono.variable}`} />;
+  // With a viewer token → the private (owner-shared) viewer. Without one →
+  // the public realtime viewer (anyone can watch while sharing is active).
+  return token ? (
+    <LiveViewer token={token} fontClassName={fontClassName} />
+  ) : (
+    <PublicLiveViewer fontClassName={fontClassName} />
+  );
 }
 
 function normalizeToken(value: string | string[] | undefined): string {

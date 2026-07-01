@@ -1,22 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { useLiveLocation } from "@/lib/trip-gps/use-live-location";
 import styles from "./trip.module.css";
-
-type LiveLocation = {
-  lat: number;
-  lng: number;
-  speedMps: number | null;
-  mode: string;
-};
-
-type LiveState =
-  | { status: "connecting" }
-  | { status: "idle" }
-  | { status: "live"; loc: LiveLocation }
-  | { status: "unavailable" };
 
 const MODE_LABEL: Record<string, string> = {
   active: "ปกติ",
@@ -27,86 +12,6 @@ const MODE_LABEL: Record<string, string> = {
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
-}
-
-function toLoc(row: Record<string, unknown> | null | undefined): LiveLocation | null {
-  if (!row) {
-    return null;
-  }
-
-  const lat = Number(row.lat);
-  const lng = Number(row.lng);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    return null;
-  }
-
-  return {
-    lat,
-    lng,
-    speedMps: typeof row.speed_mps === "number" ? row.speed_mps : null,
-    mode: typeof row.mode === "string" ? row.mode : "active",
-  };
-}
-
-// Subscribes to Supabase Realtime for the latest shared location. A row in
-// trip_location_latest exists only while a session is active (the session-end
-// trigger deletes it), so presence = "currently sharing".
-function useLiveLocation(): LiveState {
-  const [state, setState] = useState<LiveState>({ status: "connecting" });
-
-  useEffect(() => {
-    const supabase = getSupabaseBrowser();
-
-    if (!supabase) {
-      setState({ status: "unavailable" });
-      return undefined;
-    }
-
-    let subscribed = true;
-
-    void supabase
-      .from("trip_location_latest")
-      .select("lat,lng,speed_mps,mode,server_ts")
-      .order("server_ts", { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (!subscribed) {
-          return;
-        }
-
-        const loc = toLoc(data?.[0]);
-        setState(loc ? { status: "live", loc } : { status: "idle" });
-      });
-
-    const channel = supabase
-      .channel("trip-001-live-location")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "trip_location_latest" },
-        (payload) => {
-          if (!subscribed) {
-            return;
-          }
-
-          if (payload.eventType === "DELETE") {
-            setState({ status: "idle" });
-            return;
-          }
-
-          const loc = toLoc(payload.new as Record<string, unknown>);
-          setState(loc ? { status: "live", loc } : { status: "idle" });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      subscribed = false;
-      void supabase.removeChannel(channel);
-    };
-  }, []);
-
-  return state;
 }
 
 export function TripLiveStatus() {
@@ -130,13 +35,8 @@ export function TripLiveStatus() {
             {MODE_LABEL[live.mode] ? ` · โหมด ${MODE_LABEL[live.mode]}` : ""}
           </p>
           <div className={styles.liveStatusActions}>
-            <a
-              className={styles.liveMapLink}
-              href={`https://www.google.com/maps/search/?api=1&query=${live.lat},${live.lng}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              เปิดใน Google Maps ↗
+            <a className={styles.liveMapLink} href="/trip/001/live">
+              ดูหน้าติดตามสด →
             </a>
             <span className={styles.liveStatusUpdated}>อัปเดตอัตโนมัติแบบ realtime</span>
           </div>
