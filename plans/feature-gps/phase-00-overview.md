@@ -25,7 +25,7 @@ Live-location sharing for the existing private roadbook at `app/trip/001`.
 ## Non-negotiable guardrails (apply to EVERY phase)
 
 1. **Branch:** all implementation happens on **`feat/gps`**. Never commit feature code to `develop`. (Phase 1 creates/switches the branch.)
-2. **Security boundary:** `/trip/001` is **public now** (the old client-side password `1942` gate was removed). Page access is therefore **not** a security boundary — owner upload and viewer reads are gated only by server-side tokens / a server-side owner code (Phase 7). Never gate live location on page access or any client-side secret.
+2. **Security boundary:** `/trip/001` is **public now** (the old client-side password gate was removed). Page access is therefore **not** a security boundary — owner upload and viewer reads are gated only by server-side tokens / a server-side owner code (Phase 7). Never gate live location on page access or any client-side secret.
 3. **Secrets:** no server secret / Supabase service-role key in the client bundle or any `NEXT_PUBLIC_*`. Server-only env, accessed only in Route Handlers, Fastify handlers, or server modules.
 4. **Cost = 0 ฿:** stay inside free tiers. Do not add a paid API, billing card, or paid map/tile provider without updating the plan and asking first. MVP map = Google Maps external link.
 5. **Dependency gate:** add a dependency only when its phase calls for it. Approved for the web app: `leaflet` (optional map enhancement). Approved for the Fastify backend track in Phase 11: `fastify`, `@fastify/cors`, `@fastify/helmet`, `@fastify/rate-limit`, `@fastify/sensible`, `@sinclair/typebox`, `@supabase/supabase-js`, `tsx`, and `vitest`. Not now: `react-leaflet`, `socket.io`, `firebase`, and `zod`.
@@ -126,7 +126,7 @@ For the backend split, hand off Phase 11 directly:
 
 ```
 claude: Implement plans/feature-gps/phase-11-fastify-backend.md.
-Read plans/feature-gps/phase-00-overview.md and docs/trip-gps-env-vars.md first.
+Read plans/feature-gps/phase-00-overview.md and docs/env-doc.md first.
 Use Fastify + TypeScript in apps/api. Do not implement the superseded Next Route
 Handler phases. Keep secrets server-only. When done, run backend lint/build/test
 and web lint/build, then report files changed + verification gaps.

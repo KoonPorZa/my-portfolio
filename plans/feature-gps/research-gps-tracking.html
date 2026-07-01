@@ -562,7 +562,7 @@
       <div class="repo-note">
         <div class="repo-line"><strong>Repo fact:</strong> <code>package.json</code> ใช้ Next.js 16.2.9, React 19.2.4, ยังไม่มี dependency ด้าน map/realtime เพิ่มเติม</div>
         <div class="repo-line"><strong>Repo fact:</strong> <code>app/trip-01/page.tsx</code> เป็น Server Component ที่ render <code>Trip01Client</code>; browser APIs ต้องอยู่ใน Client Component ตาม Next docs ที่อ่านจาก <code>node_modules/next/dist/docs/...</code></div>
-        <div class="repo-line"><strong>Repo fact:</strong> <code>Trip01Client</code> มี password gate ฝั่ง client hardcoded เป็น <code>1942</code>; ใช้กันคนทั่วไปดูแผนได้ระดับหนึ่ง แต่ไม่ควรใช้เป็น security boundary สำหรับ live location</div>
+        <div class="repo-line"><strong>Repo fact:</strong> <code>Trip01Client</code> มี password gate ฝั่ง client hardcoded ไว้ฝั่ง client; ใช้กันคนทั่วไปดูแผนได้ระดับหนึ่ง แต่ไม่ควรใช้เป็น security boundary สำหรับ live location</div>
       </div>
 
       <div class="decision-grid" style="margin-top:16px">
