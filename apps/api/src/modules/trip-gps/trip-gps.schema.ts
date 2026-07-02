@@ -154,6 +154,8 @@ export const ProgressResponseSchema = Type.Object({
 export const ErrorResponseSchema = Type.Object({
   error: Type.String(),
   message: Type.String(),
+  // Echoed request id so a user can quote it when reporting an error (Phase 16).
+  requestId: Type.Optional(Type.String()),
 });
 
 // Superset object: fallback=false → all fields present; fallback=true → only reason present.

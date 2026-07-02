@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
 
+import type { ServerEnv } from "../../config/env";
+import { ApiError, isApiError } from "../../lib/errors";
+import type { OwnerCodeThrottle } from "./owner-code-throttle";
 import type { SessionEndAction } from "./trip-gps.types";
 import type { TripGpsService } from "./trip-gps.service";
 import { readBearerToken } from "./trip-gps.service";
@@ -20,9 +23,51 @@ import {
 } from "./trip-gps.schema";
 import type { GoogleRouteHandler } from "./google-route";
 
+export type RouteRateLimit = {
+  max: number;
+  timeWindow: string;
+  groupId: string;
+};
+
+export type TripGpsRateLimits = {
+  owner: RouteRateLimit;
+  viewer: RouteRateLimit;
+  sessionStart: RouteRateLimit;
+  googleRoute: RouteRateLimit;
+};
+
+export function buildTripGpsRateLimits(env: ServerEnv): TripGpsRateLimits {
+  return {
+    owner: {
+      max: env.rateLimitOwnerMax,
+      timeWindow: env.rateLimitWindow,
+      groupId: "trip-gps-owner",
+    },
+    viewer: {
+      max: env.rateLimitViewerMax,
+      timeWindow: env.rateLimitWindow,
+      groupId: "trip-gps-viewer",
+    },
+    // Owner-code entry point gets its own, tighter bucket so it can't ride the
+    // broader owner-write budget while being brute-forced.
+    sessionStart: {
+      max: env.rateLimitSessionStartMax,
+      timeWindow: env.rateLimitWindow,
+      groupId: "trip-gps-session-start",
+    },
+    googleRoute: {
+      max: env.rateLimitGoogleRouteMax,
+      timeWindow: env.rateLimitWindow,
+      groupId: "trip-gps-google",
+    },
+  };
+}
+
 type TripGpsRouteOptions = {
   service: TripGpsService;
   googleRouteHandler: GoogleRouteHandler;
+  ownerCodeThrottle: OwnerCodeThrottle;
+  limits: TripGpsRateLimits;
 };
 
 type TripParams = {
@@ -48,28 +93,12 @@ type ProgressBody = {
   action?: "set" | "clear";
 };
 
-const OWNER_RATE_LIMIT = {
-  max: 20,
-  timeWindow: "1 minute",
-  groupId: "trip-gps-owner",
-};
-
-const VIEWER_RATE_LIMIT = {
-  max: 60,
-  timeWindow: "1 minute",
-  groupId: "trip-gps-viewer",
-};
-
-const GOOGLE_ROUTE_RATE_LIMIT = {
-  max: 10,
-  timeWindow: "1 minute",
-  groupId: "trip-gps-google",
-};
-
 export async function tripGpsRoutes(
   fastify: FastifyInstance,
   options: TripGpsRouteOptions
 ) {
+  const { limits } = options;
+
   fastify.post<{
     Params: TripParams;
     Body: unknown;
@@ -77,7 +106,7 @@ export async function tripGpsRoutes(
     "/api/trips/:tripId/location",
     {
       config: {
-        rateLimit: OWNER_RATE_LIMIT,
+        rateLimit: limits.owner,
       },
       schema: {
         params: TripParamsSchema,
@@ -108,7 +137,7 @@ export async function tripGpsRoutes(
     "/api/trips/:tripId/location",
     {
       config: {
-        rateLimit: VIEWER_RATE_LIMIT,
+        rateLimit: limits.viewer,
       },
       schema: {
         params: TripParamsSchema,
@@ -137,7 +166,7 @@ export async function tripGpsRoutes(
     "/api/trips/:tripId/session/start",
     {
       config: {
-        rateLimit: OWNER_RATE_LIMIT,
+        rateLimit: limits.sessionStart,
       },
       schema: {
         params: TripParamsSchema,
@@ -153,10 +182,31 @@ export async function tripGpsRoutes(
       },
     },
     async (request) => {
-      return options.service.startSession(
-        request.params.tripId,
-        normalizeOptionalString(request.body.code)
-      );
+      const ip = request.ip;
+
+      // A locked IP and a wrong code return the exact same generic 401, so a
+      // brute-forcer can't tell whether it's being throttled.
+      if (options.ownerCodeThrottle.isLocked(ip)) {
+        throw invalidOwnerCode();
+      }
+
+      try {
+        const result = await options.service.startSession(
+          request.params.tripId,
+          normalizeOptionalString(request.body.code)
+        );
+        options.ownerCodeThrottle.recordSuccess(ip);
+        return result;
+      } catch (error) {
+        // Only a genuinely wrong code counts toward the lock — a missing owner
+        // code config (503) or any other error passes through untouched.
+        if (isApiError(error) && error.code === "invalid_owner_code") {
+          options.ownerCodeThrottle.recordFailure(ip);
+          throw invalidOwnerCode();
+        }
+
+        throw error;
+      }
     }
   );
 
@@ -167,7 +217,7 @@ export async function tripGpsRoutes(
     "/api/trips/:tripId/session/stop",
     {
       config: {
-        rateLimit: OWNER_RATE_LIMIT,
+        rateLimit: limits.owner,
       },
       schema: {
         params: TripParamsSchema,
@@ -198,7 +248,7 @@ export async function tripGpsRoutes(
     "/api/trips/:tripId/google-route",
     {
       config: {
-        rateLimit: GOOGLE_ROUTE_RATE_LIMIT,
+        rateLimit: limits.googleRoute,
       },
       schema: {
         params: TripParamsSchema,
@@ -220,7 +270,7 @@ export async function tripGpsRoutes(
     "/api/trips/:tripId/progress",
     {
       config: {
-        rateLimit: OWNER_RATE_LIMIT,
+        rateLimit: limits.owner,
       },
       schema: {
         params: TripParamsSchema,
@@ -242,6 +292,10 @@ export async function tripGpsRoutes(
       });
     }
   );
+}
+
+function invalidOwnerCode(): ApiError {
+  return new ApiError(401, "invalid_owner_code", "Invalid or missing owner code.");
 }
 
 function normalizeOptionalString(value: unknown): string | null {

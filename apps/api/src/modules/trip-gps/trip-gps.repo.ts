@@ -26,6 +26,9 @@ export type LocationStorePoint = LocationPayload & {
 };
 
 export interface TripGpsRepo {
+  // Lightweight readiness probe for /ready. Resolves when the store is
+  // reachable; rejects otherwise. Must be cheap (no row scans).
+  ping(): Promise<void>;
   createShareSession(session: ShareSession): Promise<ShareSession>;
   findOwnerSessionByToken(
     token: string,
@@ -150,6 +153,10 @@ export class InMemoryTripGpsRepo implements TripGpsRepo {
   private readonly latest = new Map<string, LocationLatest>();
   private readonly history = new Map<string, LocationStorePoint[]>();
   private readonly stopArrivals = new Map<string, Map<number, StopArrival>>();
+
+  async ping(): Promise<void> {
+    // In-memory store is always ready.
+  }
 
   async createShareSession(session: ShareSession): Promise<ShareSession> {
     const stored = { ...session };
@@ -385,6 +392,18 @@ export class InMemoryTripGpsRepo implements TripGpsRepo {
 
 export class SupabaseTripGpsRepo implements TripGpsRepo {
   constructor(private readonly getClient: () => TripGpsSupabaseClient) {}
+
+  async ping(): Promise<void> {
+    // HEAD-only count: reaches PostgREST + the table without scanning rows.
+    const { error } = await this.getClient()
+      .from("trip_share_sessions")
+      .select("id", { count: "exact", head: true })
+      .limit(1);
+
+    if (error) {
+      throwSupabaseError("ping", error);
+    }
+  }
 
   async createShareSession(session: ShareSession): Promise<ShareSession> {
     const { data, error } = await this.getClient()

@@ -1,6 +1,8 @@
 export type TripGpsStoreRequest = "auto" | "supabase" | "mock" | "memory";
 export type TripGpsStoreMode = "supabase" | "memory";
 
+export type TrustProxySetting = boolean | number | string;
+
 export type ServerEnv = {
   nodeEnv: string;
   port: number;
@@ -14,6 +16,28 @@ export type ServerEnv = {
   googleMapsRoutesApiKey: string;
   tripGoogleRouteCacheTtlSeconds: number;
   tripGoogleRouteDailyQuota: number;
+  // --- Phase 14: API hardening -------------------------------------------
+  // How many proxy hops to trust when deriving request.ip. Railway sits behind
+  // one proxy, so the default is 1 (NOT `true`, which trusts a client-supplied
+  // x-forwarded-for and makes every per-IP limit spoofable). Set to 2 if the API
+  // is also Cloudflare-proxied. Verify request.ip on the real host (docs/env-doc.md).
+  trustProxy: TrustProxySetting;
+  // Max request body size in bytes. GPS payloads are tiny; a small cap rejects
+  // junk/oversized writes with 413 before they touch the store.
+  bodyLimitBytes: number;
+  rateLimitWindow: string;
+  rateLimitViewerMax: number;
+  rateLimitOwnerMax: number;
+  rateLimitSessionStartMax: number;
+  rateLimitGoogleRouteMax: number;
+  // Owner-code brute-force guard: after N wrong codes from one client IP, lock
+  // that IP for a cooldown window and answer with a generic 401 (no oracle).
+  ownerCodeMaxAttempts: number;
+  ownerCodeLockMs: number;
+  // --- Phase 16: observability -------------------------------------------
+  // Git commit the running instance was built from (Railway injects
+  // RAILWAY_GIT_COMMIT_SHA); surfaced on /health and /version.
+  gitCommitSha: string;
 };
 
 type EnvSource = NodeJS.ProcessEnv | Record<string, string | undefined>;
@@ -54,7 +78,54 @@ export function readServerEnv(source: EnvSource = process.env): ServerEnv {
       source.TRIP_GOOGLE_ROUTE_DAILY_QUOTA,
       50
     ),
+    trustProxy: readTrustProxy(source.TRUST_PROXY),
+    bodyLimitBytes: readPositiveInteger(source.BODY_LIMIT_BYTES, 16_384),
+    rateLimitWindow: trim(source.RATE_LIMIT_WINDOW) || "1 minute",
+    rateLimitViewerMax: readPositiveInteger(source.RATE_LIMIT_VIEWER_MAX, 60),
+    rateLimitOwnerMax: readPositiveInteger(source.RATE_LIMIT_OWNER_MAX, 20),
+    rateLimitSessionStartMax: readPositiveInteger(
+      source.RATE_LIMIT_SESSION_START_MAX,
+      5
+    ),
+    rateLimitGoogleRouteMax: readPositiveInteger(
+      source.RATE_LIMIT_GOOGLE_ROUTE_MAX,
+      10
+    ),
+    ownerCodeMaxAttempts: readPositiveInteger(
+      source.OWNER_CODE_MAX_ATTEMPTS,
+      10
+    ),
+    ownerCodeLockMs:
+      readPositiveInteger(source.OWNER_CODE_LOCK_MINUTES, 15) * 60_000,
+    gitCommitSha:
+      trim(source.RAILWAY_GIT_COMMIT_SHA) || trim(source.GIT_SHA) || "",
   };
+}
+
+// Fastify's `trustProxy` accepts a boolean, a hop count, or a comma-separated
+// list of trusted IPs/subnets. `true` trusts a client-supplied
+// x-forwarded-for (spoofable) — avoid it. Default: trust 1 hop (Railway).
+function readTrustProxy(value: string | undefined): TrustProxySetting {
+  const normalized = trim(value);
+
+  if (!normalized) {
+    return 1;
+  }
+
+  if (normalized === "true") {
+    return true;
+  }
+
+  if (normalized === "false") {
+    return false;
+  }
+
+  const asNumber = Number(normalized);
+  if (Number.isInteger(asNumber) && asNumber >= 0) {
+    return asNumber;
+  }
+
+  return normalized;
 }
 
 export function hasRealSupabaseConfig(

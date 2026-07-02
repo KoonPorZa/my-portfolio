@@ -7,6 +7,8 @@ export type ApiErrorCode =
   | "forbidden"
   | "too_frequent"
   | "rate_limited"
+  | "payload_too_large"
+  | "unsupported_media_type"
   | "internal_error";
 
 export class ApiError extends Error {
@@ -24,10 +26,15 @@ export function isApiError(error: unknown): error is ApiError {
   return error instanceof ApiError;
 }
 
-export function errorBody(code: ApiErrorCode, message: string) {
+export function errorBody(
+  code: ApiErrorCode,
+  message: string,
+  requestId?: string
+) {
   return {
     error: code,
     message,
+    ...(requestId ? { requestId } : {}),
   };
 }
 
