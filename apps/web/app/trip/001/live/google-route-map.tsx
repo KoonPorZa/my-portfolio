@@ -39,7 +39,9 @@ export function GoogleRouteMap({
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const liveMarkerRef = useRef<google.maps.Marker | null>(null);
+  const actualTrackRef = useRef<google.maps.Polyline | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const fellBackRef = useRef(false);
 
   function triggerFallback() {
@@ -119,19 +121,11 @@ export function GoogleRouteMap({
         map,
       });
 
-      // Actual GPS track (green).
-      const validTrack = actualTrack.filter(
-        (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng),
-      );
-      if (validTrack.length >= 2) {
-        new google.maps.Polyline({
-          path: validTrack,
-          strokeColor: ACTUAL_TRACK_COLOR,
-          strokeOpacity: 0.95,
-          strokeWeight: 4.5,
-          map,
-        });
-        for (const pt of validTrack) bounds.extend(pt);
+      // Actual GPS track (green) is drawn + kept in sync by the effect below so
+      // it updates live as new realtime points arrive (not just at init). Seed
+      // the fit bounds with the initial track so the first view frames it.
+      for (const pt of actualTrack) {
+        if (Number.isFinite(pt.lat) && Number.isFinite(pt.lng)) bounds.extend(pt);
       }
 
       // Numbered stop markers (trip-stops stores coords as [lat, lng]).
@@ -164,6 +158,8 @@ export function GoogleRouteMap({
       }
 
       map.fitBounds(bounds, { top: 42, bottom: 52, left: 34, right: 34 });
+
+      if (!cancelled) setMapReady(true);
     }
 
     void init();
@@ -173,6 +169,32 @@ export function GoogleRouteMap({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Draw + keep the actual GPS breadcrumb (green) in sync as realtime points
+  // arrive. Runs on the first map-ready tick and on every actualTrack change.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (actualTrackRef.current) {
+      actualTrackRef.current.setMap(null);
+      actualTrackRef.current = null;
+    }
+
+    const validTrack = actualTrack.filter(
+      (p) => Number.isFinite(p.lat) && Number.isFinite(p.lng),
+    );
+
+    if (validTrack.length >= 2) {
+      actualTrackRef.current = new google.maps.Polyline({
+        path: validTrack,
+        strokeColor: ACTUAL_TRACK_COLOR,
+        strokeOpacity: 0.95,
+        strokeWeight: 4.5,
+        map,
+      });
+    }
+  }, [actualTrack, mapReady]);
 
   // Update live marker position when prop changes after init.
   useEffect(() => {

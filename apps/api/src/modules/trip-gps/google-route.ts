@@ -41,7 +41,9 @@ export type GoogleRouteHandler = (tripId: string) => Promise<GoogleRouteResult>;
 
 export function createGoogleRouteHandler(
   env: ServerEnv,
-  log: Pick<FastifyBaseLogger, "error"> = console
+  // `info` powers cost-guard observability (cache hit/miss, upstream count,
+  // quota state). The API key is NEVER included in any log field.
+  log: Pick<FastifyBaseLogger, "error" | "info"> = console
 ): GoogleRouteHandler {
   const cache = new Map<string, CacheEntry>();
   let dayCounter: DayCounter = { utcDay: "", count: 0 };
@@ -63,6 +65,10 @@ export function createGoogleRouteHandler(
     const cached = cache.get(cacheKey);
 
     if (cached && now < cached.expiresAt) {
+      log.info(
+        { tripId, cache: "hit", expiresAt: cached.data.expiresAt },
+        "[google-route] served planned route from cache"
+      );
       return cached.data;
     }
 
@@ -73,6 +79,16 @@ export function createGoogleRouteHandler(
     }
 
     if (dayCounter.count >= env.tripGoogleRouteDailyQuota) {
+      log.info(
+        {
+          tripId,
+          cache: "miss",
+          guard: "quota",
+          upstreamCallsToday: dayCounter.count,
+          dailyQuota: env.tripGoogleRouteDailyQuota,
+        },
+        "[google-route] daily upstream quota reached — serving free-map fallback"
+      );
       return { fallback: true, reason: "quota" };
     }
 
@@ -83,6 +99,17 @@ export function createGoogleRouteHandler(
     }
 
     dayCounter.count += 1;
+
+    log.info(
+      {
+        tripId,
+        cache: "miss",
+        upstreamCallsToday: dayCounter.count,
+        dailyQuota: env.tripGoogleRouteDailyQuota,
+        nearQuota: dayCounter.count >= env.tripGoogleRouteDailyQuota,
+      },
+      "[google-route] fetched fresh planned route from Google Routes API"
+    );
 
     const ttlMs = env.tripGoogleRouteCacheTtlSeconds * 1_000;
     const cachedAt = new Date(now).toISOString();

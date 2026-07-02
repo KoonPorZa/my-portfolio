@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 
 import { buildApp } from "../app";
 import { readServerEnv } from "../config/env";
+import { createGoogleRouteHandler } from "../modules/trip-gps/google-route";
 
 const OWNER_CODE = "owner-secret";
 
@@ -134,5 +135,50 @@ describe("GET /api/trips/001/google-route", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ fallback: true, reason: "quota" });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("google-route cost-guard observability (Phase 16)", () => {
+  function makeEnv(overrides: Record<string, string> = {}) {
+    return readServerEnv({
+      NODE_ENV: "test",
+      TRIP_GPS_STORE: "memory",
+      GOOGLE_MAPS_ROUTES_API_KEY: "fake-key",
+      ...overrides,
+    });
+  }
+
+  it("logs cache miss→upstream then cache hit, never the API key", async () => {
+    vi.stubGlobal("fetch", makeFetchSuccess());
+    const log = { info: vi.fn(), error: vi.fn() };
+    const handler = createGoogleRouteHandler(makeEnv(), log);
+
+    await handler("001"); // miss → upstream
+    await handler("001"); // hit → cache
+
+    const events = log.info.mock.calls.map((call) => call[0]);
+    expect(events).toContainEqual(expect.objectContaining({ cache: "miss", upstreamCallsToday: 1 }));
+    expect(events).toContainEqual(expect.objectContaining({ cache: "hit" }));
+
+    // The API key must never appear in any logged field.
+    const serialized = JSON.stringify(log.info.mock.calls) + JSON.stringify(log.error.mock.calls);
+    expect(serialized).not.toContain("fake-key");
+  });
+
+  it("logs the quota guard when the daily cap is exhausted", async () => {
+    const fetchSpy = vi.fn() as unknown as typeof globalThis.fetch;
+    vi.stubGlobal("fetch", fetchSpy);
+    const log = { info: vi.fn(), error: vi.fn() };
+    const handler = createGoogleRouteHandler(
+      makeEnv({ TRIP_GOOGLE_ROUTE_DAILY_QUOTA: "0" }),
+      log
+    );
+
+    const result = await handler("001");
+
+    expect(result).toEqual({ fallback: true, reason: "quota" });
+    expect(log.info.mock.calls.map((call) => call[0])).toContainEqual(
+      expect.objectContaining({ guard: "quota" })
+    );
   });
 });
