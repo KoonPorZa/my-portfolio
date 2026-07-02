@@ -66,6 +66,16 @@ export function GoogleRouteMap({
           headers: { Accept: "application/json" },
           cache: "no-store",
         });
+        // A non-2xx response (e.g. 404 from a stale backend, 429 rate-limit, 5xx)
+        // is NOT the {fallback}/{route} contract — bail instead of parsing it as a
+        // route and crashing on a missing encodedPolyline. On 200 the API always
+        // returns a valid GoogleRouteResponse (TypeBox-validated).
+        if (!res.ok) {
+          if (!cancelled) {
+            setLoadError("เส้นทาง Google ไม่พร้อม — ลองรีเฟรชอีกครั้ง");
+          }
+          return;
+        }
         const json = (await res.json()) as GoogleRouteResponse;
         routeData = json;
       } catch {
