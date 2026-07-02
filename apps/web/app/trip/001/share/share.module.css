@@ -1,0 +1,56 @@
+.sharePage {
+  padding-top: max(28px, env(safe-area-inset-top));
+}
+
+.shareHeader {
+  padding: 30px 0 6px;
+}
+
+.kicker {
+  margin: 0;
+  font-family: var(--trip-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-deep);
+}
+
+.shareHeader h1 {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: clamp(2rem, 9vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.shareHeader p:last-child {
+  max-width: 48ch;
+  margin: 14px 0 0;
+  color: var(--ink-soft);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.disabledNotice {
+  margin: 28px 0 0;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-soft);
+  padding: 18px;
+}
+
+.disabledNotice h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.disabledNotice p {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}

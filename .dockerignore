@@ -1,0 +1,44 @@
+# Build context = repo root. Keep it small and never ship local secrets.
+# NOTE: do NOT ignore the files the Dockerfile COPYs — package-lock.json, both
+# workspace package.json files, apps/api/tsconfig.json, and apps/api/src.
+
+# VCS
+.git
+.gitattributes
+.gitignore
+
+# dependencies (reinstalled inside the image)
+# (explicit one-level globs too: the legacy Docker builder ignores `**`)
+node_modules
+*/node_modules
+apps/*/node_modules
+**/node_modules
+
+# build outputs
+dist
+apps/*/dist
+**/dist
+apps/*/.next
+apps/*/.open-next
+apps/*/.wrangler
+out
+
+# local env / secrets — must never enter the image
+**/.env
+**/.env.*
+!**/.env.example
+
+# logs & OS/editor cruft
+**/*.log
+.DS_Store
+
+# tooling / docs not needed for the API image
+.github
+.omc
+.claude
+.playwright-mcp
+.vscode
+.idea
+docs
+plans
+**/*.md

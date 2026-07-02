@@ -1,0 +1,19 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "main": ".open-next/worker.js",
+  "name": "portfolio-koonporza-web",
+  // OpenNext requires nodejs_compat + a compatibility date >= 2024-09-23.
+  // node:crypto (used by the GPS token logic) is available under nodejs_compat.
+  "compatibility_date": "2025-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  }
+  // Runtime server secrets (only needed if the in-app Next API fallback is used
+  // instead of the external Fastify backend) are set via `wrangler secret put`
+  // or the dashboard, NOT committed here. See docs/env-doc.md.
+}

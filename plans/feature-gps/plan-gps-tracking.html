@@ -1,0 +1,1393 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Implementation Plan: GPS Tracking for Trip 01</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7efe1;
+      --paper: #fffaf0;
+      --paper-2: #f3e6d2;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9c8ad;
+      --blue: #0b4d85;
+      --blue-deep: #07345f;
+      --orange: #c05621;
+      --green: #156c3b;
+      --red: #a11d33;
+      --violet: #5b2ea6;
+      --black: #121826;
+      --shadow: 0 24px 70px rgba(68, 48, 18, .13);
+      --radius: 26px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        linear-gradient(115deg, rgba(7, 52, 95, .12), transparent 30rem),
+        radial-gradient(circle at 78% 0%, rgba(192, 86, 33, .18), transparent 34rem),
+        radial-gradient(circle at 10% 10%, rgba(21, 108, 59, .11), transparent 26rem),
+        var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Noto Sans", sans-serif;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--blue-deep); text-underline-offset: .22em; }
+    code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    code {
+      border: 1px solid rgba(7, 52, 95, .12);
+      border-radius: 8px;
+      background: rgba(7, 52, 95, .06);
+      padding: .08rem .34rem;
+      color: #0f3158;
+      font-size: .93em;
+    }
+    pre {
+      margin: 14px 0 0;
+      padding: 18px;
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: #111827;
+      color: #e7f1ff;
+      font-size: .88rem;
+      line-height: 1.55;
+    }
+    pre code { border: 0; background: transparent; color: inherit; padding: 0; }
+
+    .page {
+      width: min(1200px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0 70px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 34px;
+      background:
+        linear-gradient(135deg, rgba(255,255,255,.86), rgba(255,250,240,.96)),
+        var(--paper);
+      box-shadow: var(--shadow);
+      padding: clamp(26px, 6vw, 62px);
+    }
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 16px;
+      border: 1px dashed rgba(7, 52, 95, .18);
+      border-radius: 26px;
+      pointer-events: none;
+    }
+    .hero::after {
+      content: "feat/gps";
+      position: absolute;
+      right: clamp(20px, 4vw, 42px);
+      top: clamp(18px, 4vw, 38px);
+      transform: rotate(5deg);
+      border: 2px solid rgba(192, 86, 33, .35);
+      border-radius: 999px;
+      background: #fff3de;
+      color: #7c2d12;
+      padding: 9px 15px;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .kicker, .tag, .badge {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      border-radius: 999px;
+      font-weight: 900;
+      line-height: 1.3;
+    }
+    .kicker {
+      margin: 0 0 18px;
+      border: 1px solid rgba(7, 52, 95, .18);
+      background: rgba(7, 52, 95, .08);
+      color: var(--blue-deep);
+      padding: 8px 12px;
+      font-size: .78rem;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { color: var(--ink); line-height: 1.08; }
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(2.45rem, 7vw, 6.2rem);
+      font-weight: 950;
+      letter-spacing: -.07em;
+    }
+    .subtitle {
+      max-width: 850px;
+      margin: 22px 0 0;
+      color: #334155;
+      font-size: clamp(1.02rem, 2vw, 1.22rem);
+    }
+
+    .hero-grid, .metric-grid, .two-grid, .three-grid, .four-grid, .lane-grid, .check-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .hero-grid { grid-template-columns: 1fr .72fr; margin-top: 24px; }
+    .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .two-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .three-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .four-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .lane-grid { grid-template-columns: 1.05fr .95fr; }
+    .check-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .panel, .card, .toc, .metric, .phase, .callout, .table-wrap, .decision, .file-card, .verify-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(255,250,240,.9);
+      box-shadow: var(--shadow);
+    }
+    .panel, .card, .metric, .callout, .decision, .file-card, .verify-card { padding: 20px; }
+
+    .branch-panel {
+      background: linear-gradient(135deg, #10213a, #0b4d85);
+      color: #f8fbff;
+      border-color: rgba(255,255,255,.14);
+    }
+    .branch-panel h2, .branch-panel p, .branch-panel code { color: #f8fbff; }
+    .branch-panel code { border-color: rgba(255,255,255,.22); background: rgba(255,255,255,.1); }
+
+    .metric b { display: block; font-size: 1.08rem; }
+    .metric span { display: block; margin-top: 4px; color: var(--muted); font-size: .93rem; }
+    .branch-panel .metric { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.14); box-shadow: none; }
+    .branch-panel .metric span { color: rgba(248,251,255,.78); }
+
+    .toc {
+      margin: 18px 0 28px;
+      padding: 18px;
+    }
+    .toc h2 { margin: 0 0 10px; font-size: 1rem; letter-spacing: .02em; }
+    .toc ol {
+      margin: 0;
+      padding-left: 1.25rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 8px;
+    }
+
+    section { padding: 34px 0; scroll-margin-top: 20px; }
+    .section-head { margin-bottom: 18px; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--blue-deep);
+      font-size: .78rem;
+      font-weight: 950;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    h2 { margin: 0; font-size: clamp(1.8rem, 4.3vw, 3.25rem); letter-spacing: -.045em; }
+    h3 { margin: 0 0 9px; font-size: 1.18rem; letter-spacing: -.02em; }
+    p { margin: 0; color: #40506a; }
+    ul, ol { margin: 10px 0 0; padding-left: 1.22rem; color: #40506a; }
+    li + li { margin-top: 4px; }
+
+    .tag { padding: 5px 10px; border: 1px solid rgba(23,32,51,.12); background: #fff3de; color: #7c2d12; font-size: .76rem; }
+    .tag.blue { background: #eaf3ff; color: var(--blue-deep); }
+    .tag.green { background: #eafaf0; color: var(--green); }
+    .tag.red { background: #fff1f2; color: var(--red); }
+    .tag.violet { background: #f2ecff; color: var(--violet); }
+
+    .score {
+      display: inline-grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      background: var(--blue-deep);
+      color: white;
+      font-weight: 950;
+    }
+    .score.green { background: var(--green); }
+    .score.orange { background: var(--orange); }
+    .score.red { background: var(--red); }
+    .score.violet { background: var(--violet); }
+
+    .callout { background: #fff6e6; }
+    .callout strong { color: #8a3d05; }
+    .callout.ok { background: #eefbf3; border-color: rgba(21,108,59,.22); }
+    .callout.ok strong { color: var(--green); }
+    .callout.danger { background: #fff1f2; border-color: rgba(161,29,51,.24); }
+    .callout.danger strong { color: var(--red); }
+    .callout.blue { background: #ecf5ff; border-color: rgba(7,52,95,.22); }
+    .callout.blue strong { color: var(--blue-deep); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th, td { padding: 14px 16px; border-bottom: 1px solid rgba(217,200,173,.88); text-align: left; vertical-align: top; }
+    th { background: #f4e2c7; color: var(--blue-deep); font-size: .82rem; letter-spacing: .06em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td { color: #3d4b62; }
+
+    .roadmap { display: grid; gap: 14px; counter-reset: phase; }
+    .phase {
+      counter-increment: phase;
+      display: grid;
+      grid-template-columns: 78px 1fr;
+      gap: 16px;
+      padding: 18px;
+    }
+    .phase::before {
+      content: counter(phase, decimal-leading-zero);
+      display: grid;
+      place-items: center;
+      min-height: 78px;
+      border-radius: 22px;
+      background: var(--black);
+      color: white;
+      font-size: 1.35rem;
+      font-weight: 950;
+      letter-spacing: -.02em;
+    }
+    .phase h3 { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+    .file-card small, .verify-card small {
+      display: block;
+      color: var(--muted);
+      margin-top: 6px;
+      overflow-wrap: anywhere;
+    }
+
+    .checklist {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .checklist li {
+      position: relative;
+      border: 1px solid rgba(7,52,95,.13);
+      border-radius: 16px;
+      background: rgba(255,255,255,.54);
+      padding: 12px 12px 12px 40px;
+      color: #334155;
+    }
+    .checklist li::before {
+      content: "✓";
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      display: grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--green);
+      color: white;
+      font-size: .8rem;
+      font-weight: 900;
+    }
+
+    footer {
+      margin-top: 36px;
+      border-radius: 28px;
+      background: #121826;
+      color: #eef2ff;
+      padding: 22px;
+    }
+    footer p { color: #dbeafe; }
+
+    @media (max-width: 980px) {
+      .hero-grid, .metric-grid, .two-grid, .three-grid, .four-grid, .lane-grid, .check-grid { grid-template-columns: 1fr; }
+      .hero::after { position: static; display: inline-flex; margin-top: 18px; transform: none; }
+    }
+    @media (max-width: 640px) {
+      .page { width: min(100% - 20px, 1200px); padding-top: 18px; }
+      .hero, .panel, .card, .toc, .metric, .phase, .callout, .table-wrap, .decision, .file-card, .verify-card { border-radius: 20px; }
+      .phase { grid-template-columns: 1fr; }
+      .phase::before { width: 78px; }
+      table { min-width: 760px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero" id="top">
+      <span class="kicker">Implementation Plan · GPS Tracking · Trip 01</span>
+      <h1>แผนทำ Live Location ให้หน้า /trip-01</h1>
+      <p class="subtitle">
+        แผนนี้แปลง research จาก <code>plans/feature-gps/research-gps-tracking.html</code> ให้เป็นรายการงานที่ทำได้จริง
+        โดย scope แรกคือ Web MVP ที่ส่งตำแหน่งทุก 5–10 นาที ให้คนรู้จักดูสถานะทริปได้อย่างปลอดภัยพอสำหรับใช้งานส่วนตัว
+      </p>
+
+      <div class="hero-grid">
+        <section class="panel branch-panel" aria-label="Branch rule">
+          <h2 style="margin:0 0 12px;font-size:clamp(1.5rem,3vw,2.4rem)">Branch rule</h2>
+          <p>
+            งาน implementation ทั้งหมดของฟีเจอร์นี้ต้องทำใน branch <code>feat/gps</code> เท่านั้น ห้ามแก้ต่อบน <code>develop</code>
+            โดยตรง เพื่อแยกความเสี่ยงจากหน้า portfolio และงาน uncommitted อื่นใน repo
+          </p>
+          <pre><code># ก่อนเริ่มลงมือ implement
+# ถ้า branch ยังไม่มี
+git switch -c feat/gps
+
+# ถ้ามีอยู่แล้ว
+git switch feat/gps</code></pre>
+        </section>
+
+        <section class="panel" aria-label="Plan summary">
+          <span class="tag green">Recommended path</span>
+          <h2 style="margin:12px 0 10px;font-size:clamp(1.35rem,2.7vw,2.1rem)">ทำ Web MVP ก่อน</h2>
+          <p>
+            ใช้ <code>getCurrentPosition()</code> แบบ periodic ทุก 5 นาที, saver mode ทุก 10 นาที,
+            manual ping เมื่อถึงจุดพัก และ viewer แสดง timestamp/stale state ชัดเจน ถ้าต้องการ background tracking ตอนล็อกจอจริงค่อยทำ native tracker เป็น phase ถัดไป
+          </p>
+        </section>
+      </div>
+
+      <div class="metric-grid" style="margin-top:16px">
+        <div class="metric"><b>Update cadence</b><span>5 นาที default · 10 นาที saver · 2–3 นาทีเฉพาะเข้าเมือง</span></div>
+        <div class="metric"><b>Primary user</b><span>Rider เป็น owner; คนรู้จักเป็น viewer read-only</span></div>
+        <div class="metric"><b>Security model</b><span>Owner token + viewer token + TTL + revoke</span></div>
+        <div class="metric"><b>Done means</b><span>มือถือจริงส่งตำแหน่งได้ และ viewer เห็นจุดล่าสุดพร้อม stale status</span></div>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="สารบัญ">
+      <h2>สารบัญ</h2>
+      <ol>
+        <li><a href="#outcome">ผลลัพธ์ที่ต้องได้</a></li>
+        <li><a href="#branch">Branch & preflight</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#tech-stack">Tech stack decision</a></li>
+        <li><a href="#cost-guard">Cost guard</a></li>
+        <li><a href="#cloudflare-edge">Cloudflare edge layer</a></li>
+        <li><a href="#viewer-owner-flow">Viewer & owner GPS flow</a></li>
+        <li><a href="#phases">Implementation phases</a></li>
+        <li><a href="#files">ไฟล์ที่คาดว่าจะเปลี่ยน</a></li>
+        <li><a href="#data">Data/API contract</a></li>
+        <li><a href="#acceptance">Acceptance criteria</a></li>
+        <li><a href="#verification">Verification</a></li>
+        <li><a href="#risks">Risks</a></li>
+        <li><a href="#handoff">Execution handoff</a></li>
+      </ol>
+    </nav>
+
+    <section id="outcome">
+      <div class="section-head">
+        <p class="eyebrow">01 · Target outcome</p>
+        <h2>ผลลัพธ์ที่ต้องได้</h2>
+        <p class="subtitle" style="margin-top:12px">
+          ฟีเจอร์นี้ไม่ใช่ navigation app เต็มรูปแบบ แต่เป็น live-trip status สำหรับให้คนรู้จักดูว่าตอนนี้ rider อยู่แถวไหนแล้วระหว่างเดินทางในหน้า <code>/trip-01</code>
+        </p>
+      </div>
+
+      <div class="three-grid">
+        <article class="card">
+          <span class="score green">1</span>
+          <h3>Owner tracker บน /trip-01</h3>
+          <p>หลังปลดรหัสหน้า trip แล้ว rider เห็น panel “Live Location” พร้อม Start/Stop, mode, last sent, accuracy, permission และ manual ping</p>
+        </article>
+        <article class="card">
+          <span class="score orange">2</span>
+          <h3>Viewer page สำหรับคนรู้จัก</h3>
+          <p>คนดูเปิดลิงก์ viewer แล้วเห็นตำแหน่งล่าสุด, เวลาอัปเดต, stale/offline state, route stops และ Google Maps link หรือ map marker</p>
+        </article>
+        <article class="card">
+          <span class="score violet">3</span>
+          <h3>Privacy-first sharing</h3>
+          <p>แชร์ด้วย token ที่หมดอายุ/revoke ได้, owner หยุดแชร์ได้ทันที, ไม่ใช้รหัส client-side เดิมเป็น security boundary สำหรับข้อมูลตำแหน่งจริง</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="branch">
+      <div class="section-head">
+        <p class="eyebrow">02 · Branch & preflight</p>
+        <h2>เริ่มงานบน branch feat/gps เท่านั้น</h2>
+      </div>
+
+      <div class="two-grid">
+        <article class="callout danger">
+          <strong>สถานะ repo ตอนวางแผน:</strong>
+          branch ปัจจุบันคือ <code>develop</code> และมีไฟล์ modified/untracked หลายรายการอยู่แล้ว ดังนั้นก่อนลงมือ implement ต้องระวังไม่ให้ทับงานเดิม
+          แผนนี้กำหนด branch เป้าหมายเป็น <code>feat/gps</code> แต่ยังไม่ได้ switch branch ให้โดยอัตโนมัติ
+        </article>
+        <article class="callout ok">
+          <strong>Preflight ที่ต้องทำก่อนเขียน code:</strong>
+          ตรวจ <code>git status --short</code>, ยืนยันว่าไฟล์ที่กำลังจะเปลี่ยนเป็น scope ฟีเจอร์ GPS, แล้วค่อย <code>git switch -c feat/gps</code> หรือ <code>git switch feat/gps</code>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Command / action</th>
+              <th>Pass condition</th>
+              <th>ถ้าไม่ผ่าน</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1. Check current branch</td>
+              <td><code>git branch --show-current</code></td>
+              <td>เห็น <code>feat/gps</code> ก่อนเริ่มแก้ code</td>
+              <td>switch/create branch ก่อน</td>
+            </tr>
+            <tr>
+              <td>2. Check dirty worktree</td>
+              <td><code>git status --short</code></td>
+              <td>เข้าใจว่าไฟล์ไหนเป็นงานเดิม ไฟล์ไหนเป็นงาน GPS</td>
+              <td>อย่า reset/delete; แยก commit หรือจดรายการก่อน</td>
+            </tr>
+            <tr>
+              <td>3. Install dependency gate</td>
+              <td>ยังไม่เพิ่ม map/realtime dependency จนเลือก provider</td>
+              <td>ไม่มี dependency ใหม่โดยไม่จำเป็น</td>
+              <td>ใช้ Google Maps link/plain coordinates เป็น MVP fallback</td>
+            </tr>
+            <tr>
+              <td>4. Env gate</td>
+              <td>เตรียม <code>.env.local</code> เฉพาะเครื่อง</td>
+              <td>secret ไม่ถูก commit และ server-only key ไม่เข้า client bundle</td>
+              <td>หยุด integration แล้วใช้ mock/local mode ไปก่อน</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="section-head">
+        <p class="eyebrow">03 · Architecture decision</p>
+        <h2>สถาปัตยกรรมแนะนำสำหรับ MVP</h2>
+      </div>
+
+      <div class="lane-grid">
+        <article class="decision">
+          <span class="tag blue">ADR-001</span>
+          <h3 style="margin-top:12px">ใช้ Web MVP + periodic upload เป็น default</h3>
+          <p>
+            จาก research: browser ทำ GPS ได้ดีตอนหน้า active/visible แต่ไม่ควรรับประกัน background tracking ทั้งวัน
+            ดังนั้น implementation รอบแรกควรทำให้ใช้งานได้เมื่อเปิดหน้าไว้ และแจ้งข้อจำกัดชัดเจน แทนที่จะพยายามเลียนแบบ native app ตั้งแต่แรก
+          </p>
+          <ul>
+            <li><strong>Chosen:</strong> <code>getCurrentPosition()</code> ทุก 5 นาที, saver mode ทุก 10 นาที, manual ping</li>
+            <li><strong>Transport:</strong> HTTPS POST ไป Route Handler; viewer ใช้ polling 30–60 วินาที หรือ realtime provider ภายหลัง</li>
+            <li><strong>Backend preference:</strong> Supabase Postgres ผ่าน server route; ถ้า credential ยังไม่พร้อมให้ทำ mock adapter ก่อน</li>
+            <li><strong>Map:</strong> เริ่มด้วย coordinates + Google Maps link; เพิ่ม vanilla Leaflet เป็น enhancement ไม่ใช้ React Leaflet ใน MVP</li>
+          </ul>
+        </article>
+        <article class="decision">
+          <span class="tag violet">Non-goals</span>
+          <h3 style="margin-top:12px">สิ่งที่ยังไม่ทำใน MVP</h3>
+          <ul>
+            <li>ไม่รับประกันการส่งตำแหน่งตอนล็อกจอหรือปิด browser</li>
+            <li>ไม่ทำ turn-by-turn realtime ระดับทุกวินาที</li>
+            <li>ไม่เปิด public endpoint แบบไม่มี token</li>
+            <li>ไม่เก็บ route history ถาวรเกิน retention ที่กำหนด</li>
+            <li>ไม่เพิ่ม dependency/map SDK โดยไม่ผ่าน decision gate</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="tech-stack">
+      <div class="section-head">
+        <p class="eyebrow">04 · Tech stack decision</p>
+        <h2>เคาะ tech stack สำหรับ GPS MVP</h2>
+        <p class="subtitle" style="margin-top:12px">
+          เลือก stack ที่เพิ่ม dependency น้อยที่สุด ใช้ของที่ repo มีอยู่แล้วให้มากที่สุด และยังเหลือทางอัปเกรดเป็น realtime/native ได้ถ้าทดสอบจริงแล้ว Web MVP ไม่พอ
+        </p>
+      </div>
+
+      <div class="callout ok" style="margin-bottom:16px">
+        <strong>Decision:</strong>
+        ใช้ <code>Next.js App Router + Route Handlers + Supabase Postgres + periodic polling + vanilla Leaflet optional</code>.
+        ไม่ใช้ custom WebSocket, ไม่ใช้ Firebase ในรอบแรก, และไม่ทำ native app จนกว่าจะพิสูจน์ว่า browser background limitation เป็น blocker จริง
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Layer</th>
+              <th>Chosen stack</th>
+              <th>เหตุผล</th>
+              <th>Fallback / future</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Frontend app</td>
+              <td>Existing <code>Next.js 16 App Router</code>, <code>React 19</code>, TypeScript, CSS Modules</td>
+              <td>ตรงกับ repo ปัจจุบัน ไม่เพิ่ม framework/UI library ใหม่ และหน้า <code>/trip-01</code> เป็น Client Component อยู่แล้ว</td>
+              <td>ถ้า UI ใหญ่ขึ้นค่อยแยก design system; ยังไม่ต้องใช้ shadcn/MUI</td>
+            </tr>
+            <tr>
+              <td>GPS capture</td>
+              <td>Browser <code>navigator.geolocation.getCurrentPosition()</code> แบบ periodic snapshot</td>
+              <td>ตรง requirement ทุก 5–10 นาทีมากกว่า <code>watchPosition()</code> ตลอดเวลา ลดแบต/เน็ต และทำงานง่ายกว่าใน browser</td>
+              <td><code>watchPosition()</code> เป็น optional live/debug mode; native app เป็น future phase ถ้าต้อง track ตอน lock screen</td>
+            </tr>
+            <tr>
+              <td>Wake / visibility UX</td>
+              <td>Screen Wake Lock API optional + Page Visibility warning</td>
+              <td>ช่วยให้ owner รู้ว่า browser อาจหยุดอัปเดตเมื่อจอดับ/แท็บ hidden โดยไม่ claim เกินจริง</td>
+              <td>ถ้า Wake Lock ไม่รองรับ ให้แสดง warning และใช้ manual ping</td>
+            </tr>
+            <tr>
+              <td>API boundary</td>
+              <td>Next Route Handlers: <code>app/api/trips/trip-01/location/route.ts</code></td>
+              <td>ซ่อน server secrets, validate token/payload server-side, ใช้ runtime เดียวกับแอปเดิม</td>
+              <td>ถ้าต้องรองรับหลาย trip ค่อย generalize เป็น <code>/api/trips/[tripId]/location</code></td>
+            </tr>
+            <tr>
+              <td>Runtime</td>
+              <td>Node.js runtime สำหรับ route handler</td>
+              <td>ใช้ <code>crypto</code>, server-only env และ Supabase server client ได้ชัดเจนกว่า Edge ใน MVP</td>
+              <td>Edge runtime ยังไม่จำเป็น เพราะ update ทุก 5–10 นาที ไม่ latency-sensitive</td>
+            </tr>
+            <tr>
+              <td>Database</td>
+              <td>Supabase Postgres ผ่าน <code>@supabase/supabase-js@2</code> ฝั่ง server เท่านั้น</td>
+              <td>เหมาะกับ session/latest/history schema, ทำ TTL/retention ได้ง่าย, และต่อยอด Realtime ได้ถ้าจำเป็น</td>
+              <td>Firebase เป็น backup ถ้าต้องการ managed realtime listener ง่ายสุด แต่ไม่เลือกใน MVP เพราะ polling พอแล้ว</td>
+            </tr>
+            <tr>
+              <td>Realtime strategy</td>
+              <td>Viewer polling ทุก 30–60 วินาที</td>
+              <td>GPS update จริงทุก 5–10 นาที จึงไม่คุ้มเพิ่ม WebSocket/Realtimes ตั้งแต่แรก</td>
+              <td>Supabase Realtime/Postgres Changes เป็น P2 ถ้าคนดูหลายคนหรือ UX ต้องสดขึ้น</td>
+            </tr>
+            <tr>
+              <td>Map renderer</td>
+              <td>MVP: Google Maps external link + coordinates. Enhancement: vanilla <code>leaflet</code> client-only map</td>
+              <td>เริ่มได้ทันทีโดยไม่มี key/billing; Leaflet เพิ่ม map marker/accuracy circle ได้โดยไม่ผูกกับ React wrapper</td>
+              <td>ใช้ OSM tiles เฉพาะ low-traffic พร้อม attribution; ถ้า public/high-traffic ให้เปลี่ยน tile provider เช่น MapTiler/Mapbox/Google Maps</td>
+            </tr>
+            <tr>
+              <td>Tile provider</td>
+              <td>Configurable tile URL; default ใช้ OSM standard tiles เฉพาะส่วนตัว/traffic ต่ำ</td>
+              <td>OSM tile servers มี policy ชัดเจนเรื่อง attribution, referer, caching และไม่รับประกัน SLA จึงต้องไม่ hard-code แบบเปลี่ยนไม่ได้</td>
+              <td>ตั้ง env/config เช่น <code>NEXT_PUBLIC_TRIP_MAP_TILE_URL</code> เพื่อเปลี่ยน provider ได้</td>
+            </tr>
+            <tr>
+              <td>Validation</td>
+              <td>Manual validation utilities ใน <code>lib/trip-gps/validation.ts</code></td>
+              <td>payload เล็กมาก: lat/lng/accuracy/timestamps/mode/reason; ยังไม่จำเป็นต้องเพิ่ม <code>zod</code></td>
+              <td>ถ้า API โตขึ้นหรือมีหลาย payload ค่อยเพิ่ม <code>zod</code></td>
+            </tr>
+            <tr>
+              <td>Token/security</td>
+              <td>Node <code>crypto</code>: random token + SHA-256 hash stored server-side</td>
+              <td>ไม่ต้องเพิ่ม auth package; token แยก owner upload กับ viewer read-only, expire/revoke ได้</td>
+              <td>ถ้าต้องมี user login จริง ค่อยใช้ Supabase Auth ภายหลัง</td>
+            </tr>
+            <tr>
+              <td>Owner start auth</td>
+              <td>Server-side live-share code: owner กรอก code เฉพาะ GPS sharing เพื่อ create session</td>
+              <td>ไม่ reuse password เดิมที่อยู่ client-side เป็น security boundary สำหรับ live location</td>
+              <td>อนาคตเปลี่ยนเป็น Supabase Auth หรือ passkey ได้</td>
+            </tr>
+            <tr>
+              <td>Testing</td>
+              <td>Existing <code>npm run lint</code> + <code>npm run build</code> + manual mobile HTTPS test</td>
+              <td>repo ยังไม่มี test runner; MVP ไม่ควรเพิ่ม test dependency ก่อนมี domain logic เยอะ</td>
+              <td>ถ้าเพิ่ม unit tests ให้เลือก <code>vitest</code> เป็น P2</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="two-grid" style="margin-top:16px">
+        <article class="decision">
+          <span class="tag green">Dependencies to add</span>
+          <h3 style="margin-top:12px">เพิ่มเท่าที่จำเป็น</h3>
+          <ul>
+            <li><code>@supabase/supabase-js</code> — ใช้เฉพาะ server route/store adapter</li>
+            <li><code>leaflet</code> — เพิ่มเฉพาะเมื่อทำ map enhancement; MVP แรกใช้ Google Maps link ได้ก่อน</li>
+          </ul>
+        </article>
+        <article class="decision">
+          <span class="tag red">Dependencies not now</span>
+          <h3 style="margin-top:12px">ยังไม่เพิ่มใน MVP</h3>
+          <ul>
+            <li><code>react-leaflet</code> — เลี่ยง compatibility/SSR complexity; ใช้ vanilla Leaflet ใน client component</li>
+            <li><code>socket.io</code> / custom WebSocket — polling พอสำหรับ 5–10 นาที</li>
+            <li><code>firebase</code> — ยังไม่เลือก เพราะ Supabase Postgres เหมาะกับ session/security/history มากกว่า</li>
+            <li><code>zod</code> / <code>vitest</code> — optional future ถ้า feature โตขึ้น</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="cost-guard">
+      <div class="section-head">
+        <p class="eyebrow">05 · Cost guard</p>
+        <h2>Cost expectation: MVP ควรเป็น 0 บาท ถ้าอยู่ใน free quota</h2>
+        <p class="subtitle" style="margin-top:12px">
+          Stack ที่เคาะไว้ตั้งใจเลี่ยง paid API: ไม่ใช้ Google Maps JavaScript API, ไม่ใช้ custom realtime, ไม่ใช้ paid tile provider และใช้ Supabase/Vercel free tier เท่าที่พอสำหรับทริปส่วนตัว
+        </p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Expected cost for MVP</th>
+              <th>Free guardrail</th>
+              <th>Paid trigger ที่ต้องระวัง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Vercel hosting / Route Handlers</td>
+              <td>0 บาทบน Hobby ถ้าใช้งานส่วนตัวและ traffic ต่ำ</td>
+              <td>ใช้ route handler/polling เบา ๆ; ทริป 1 วัน request ต่ำมากเมื่อเทียบ quota free</td>
+              <td>traffic สูง, compute เยอะ, หรือย้ายเป็น Pro/team/commercial usage</td>
+            </tr>
+            <tr>
+              <td>Supabase Postgres</td>
+              <td>0 บาทถ้าใช้ Free Plan และอยู่ใน quota</td>
+              <td>ตำแหน่งทุก 5 นาที ~180 writes/15 ชม.; viewer 1 คน polling 60 วิ ~900 reads/15 ชม.; DB ใช้น้อยกว่า 500 MB มาก</td>
+              <td>เกิน DB 500 MB, egress 5 GB, ต้องการหลาย project, ต้องการไม่ pause/production guarantee, หรือเปิด realtime/traffic สูง</td>
+            </tr>
+            <tr>
+              <td>Google Maps link</td>
+              <td>0 บาท เพราะใช้ Maps URLs ไม่ต้องใช้ API key</td>
+              <td>ใช้ external link เช่น <code>https://www.google.com/maps/search/?api=1&amp;query=lat,lng</code></td>
+              <td>ถ้าเปลี่ยนเป็น Google Maps JavaScript API / Directions API / Places API จะเข้า Google Maps Platform billing</td>
+            </tr>
+            <tr>
+              <td>Leaflet package</td>
+              <td>0 บาท</td>
+              <td>ใช้ library open-source เฉพาะ client map enhancement</td>
+              <td>ไม่มีค่า library แต่ tile provider อาจมี cost/policy</td>
+            </tr>
+            <tr>
+              <td>OpenStreetMap tiles</td>
+              <td>0 บาทสำหรับ traffic ส่วนตัวต่ำ แต่ไม่ใช่บริการเชิงพาณิชย์/SLA</td>
+              <td>ต้องมี attribution, ไม่ bulk download, ไม่ prefetch/offline, cache ตาม policy, และ config tile URL ให้เปลี่ยนได้</td>
+              <td>traffic สูง, public app, ต้องการ SLA/offline/prefetch → ใช้ paid tile provider เช่น MapTiler/Mapbox/Google Maps</td>
+            </tr>
+            <tr>
+              <td>Cloudflare DNS/Proxy/WAF/Web Analytics</td>
+              <td>0 บาทถ้าอยู่ใน subscription/free quota ที่มีอยู่</td>
+              <td>ใช้เฉพาะ DNS proxy, WAF/rate limiting rules และ analytics แบบ aggregate; ไม่เพิ่ม Workers/D1/Durable Objects ใน MVP</td>
+              <td>อาจมีค่าใช้จ่ายถ้าใช้ feature plan-specific, logs/analytics ขั้นสูง, traffic สูง หรือเปิดบริการ Cloudflare อื่นเพิ่ม</td>
+            </tr>
+            <tr>
+              <td>Native app / background tracking</td>
+              <td>ยังไม่ทำใน MVP</td>
+              <td>ใช้ web-only ก่อน</td>
+              <td>ถ้าต้อง publish app store, background location จริง, หรือใช้ commercial SDK อาจมีค่าใช้จ่าย/เวลาเพิ่ม</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="callout ok" style="margin-top:16px">
+        <strong>Rule for implementation:</strong>
+        ห้ามเพิ่ม service ที่ต้องใส่ billing card หรือ paid API key โดยไม่แก้แผน/แจ้งก่อน; ถ้าต้องใช้ map จริง ให้เริ่มจาก Google Maps external link ก่อน แล้วค่อยเปิด Leaflet เฉพาะ low-traffic viewer page
+      </div>
+    </section>
+
+    <section id="cloudflare-edge">
+      <div class="section-head">
+        <p class="eyebrow">06 · Cloudflare edge layer</p>
+        <h2>Cloudflare services ที่เลือกใช้: DNS/Proxy/CDN, WAF Rate Limiting, Web Analytics</h2>
+        <p class="subtitle" style="margin-top:12px">
+          Cloudflare ในแผนนี้เป็นชั้นหน้าเว็บ ไม่ใช่ backend server เพิ่ม: ให้ request ผ่าน Cloudflare ก่อนถึง Vercel เพื่อเปิด security, rate-limit และ analytics แบบไม่เปลี่ยน Next.js full-stack architecture เดิม
+        </p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>ใช้ทำอะไรในโปรเจ็คนี้</th>
+              <th>Setup ในแผน</th>
+              <th>Guardrail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>1. DNS / Proxy / CDN</td>
+              <td>ให้ domain เช่น <code>koonporza.com</code> วิ่งผ่าน Cloudflare orange-cloud proxy ก่อนถึง Vercel เพื่อใช้ Cloudflare protection, cache/static optimization, HTTP analytics และ WAF rules</td>
+              <td>
+                <ul>
+                  <li>ตั้ง DNS record ของเว็บเป็น Proxied ถ้า record นั้น serve HTTP/HTTPS traffic</li>
+                  <li>คง Vercel verification/TXT หรือ record ที่ไม่ใช่ web traffic เป็น DNS-only ตามที่ provider ต้องการ</li>
+                  <li>ตั้ง SSL/TLS เป็น Full/Strict เมื่อ certificate ฝั่ง origin พร้อม</li>
+                  <li>ห้าม cache API location; cache ได้เฉพาะ static assets/page ที่ปลอดภัย</li>
+                </ul>
+              </td>
+              <td>อย่าเปิด cache rule ครอบ <code>/api/trips/trip-01/*</code> หรือ <code>/trip-01/live*</code>; location response ต้องเป็น dynamic และไม่ cache</td>
+            </tr>
+            <tr>
+              <td>2. WAF + Rate Limiting</td>
+              <td>กัน bot/spam/brute-force ที่ยิง location API หรือ viewer token endpoint ก่อน request ถึง Vercel/Supabase</td>
+              <td>
+                <ul>
+                  <li>Custom WAF rule scope: <code>/api/trips/trip-01/location*</code>, session endpoints, และ optional <code>/trip-01/live*</code></li>
+                  <li>Rate limit POST owner upload สูงกว่าปกติไม่ได้ เช่นเกินประมาณ 10–20 request/min/IP ให้ challenge/block</li>
+                  <li>Rate limit GET viewer latest ให้สูงกว่าการ poll ปกติ เช่น 30–60 request/min/IP เพื่อไม่กระทบ viewer polling 30–60 วินาที</li>
+                  <li>ยังต้องมี server-side token validation/rate limit ใน Next Route Handler เสมอ</li>
+                </ul>
+              </td>
+              <td>WAF เป็น defense-in-depth ไม่ใช่ auth; ถ้า Cloudflare rule พลาด API route ต้องยัง reject invalid token/payload ได้เอง</td>
+            </tr>
+            <tr>
+              <td>6. Web Analytics</td>
+              <td>ดู traffic/performance แบบ aggregate ของ portfolio, <code>/trip-01</code>, และหน้า public ที่ไม่ sensitive</td>
+              <td>
+                <ul>
+                  <li>เพิ่ม Cloudflare Web Analytics beacon เฉพาะ layout/page ที่ไม่ส่ง token ใน URL</li>
+                  <li>ใช้ดู page views, device/browser, performance trend หลัง deploy</li>
+                  <li>ถ้าจะ track viewer page ให้ทำเฉพาะแบบ sanitized route ที่ไม่มี token/query หรือใช้ internal view counter แทน</li>
+                </ul>
+              </td>
+              <td>ห้ามฝัง analytics บน URL ที่มี viewer token เช่น <code>/trip-01/live?t=...</code>; token ไม่ควรถูกส่งเข้า analytics/log ภายนอก</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="two-grid" style="margin-top:16px">
+        <article class="decision">
+          <span class="tag green">Implementation note</span>
+          <h3 style="margin-top:12px">ยังไม่ต้อง deploy backend ใหม่</h3>
+          <p>
+            Cloudflare layer นี้อยู่หน้า Vercel เท่านั้น: Next Route Handlers ยังเป็น backend API เดิม, Supabase ยังเป็น database เดิม, และ branch implementation ยังคือ <code>feat/gps</code>
+          </p>
+        </article>
+        <article class="decision">
+          <span class="tag red">Sensitive URL rule</span>
+          <h3 style="margin-top:12px">อย่าให้ token อยู่ใน analytics</h3>
+          <p>
+            ถ้า viewer token อยู่ใน query/path ให้ปิด analytics beacon บน viewer page หรือเปลี่ยนเป็น flow ที่ไม่ expose token ใน URL analytics ก่อนเปิด Web Analytics กับหน้านั้น
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section id="viewer-owner-flow">
+      <div class="section-head">
+        <p class="eyebrow">07 · Viewer & owner GPS flow</p>
+        <h2>รายละเอียดที่ต้องทำสำหรับคนดู และส่วนที่คุณต้องเปิด GPS</h2>
+        <p class="subtitle" style="margin-top:12px">
+          ฟีเจอร์นี้มี 2 ฝั่งที่ต้องออกแบบให้ชัด: ฝั่ง viewer ที่เปิดดูแบบ read-only และฝั่ง rider/owner ที่ต้องเปิด GPS + กดเริ่มแชร์เองก่อนตำแหน่งจะถูกส่งออกไป
+        </p>
+      </div>
+
+      <div class="two-grid">
+        <article class="decision">
+          <span class="tag blue">Viewer detail</span>
+          <h3 style="margin-top:12px">หน้าที่ของหน้า <code>/trip-01/live</code></h3>
+          <p>
+            Viewer page คือหน้าสำหรับคนรู้จักที่ได้รับลิงก์จากคุณ เปิดดูตำแหน่งล่าสุดได้อย่างเดียว ไม่สามารถสั่ง start/stop หรือเขียนตำแหน่งแทนคุณได้
+          </p>
+          <ul>
+            <li><strong>Entry URL:</strong> <code>/trip-01/live?t=&lt;viewer-token&gt;</code> หรือ path token ที่เทียบเท่า</li>
+            <li><strong>Auth:</strong> ส่ง token ไปตรวจที่ API; token valid + session active เท่านั้นถึงอ่าน latest location ได้</li>
+            <li><strong>Data refresh:</strong> polling <code>GET /api/trips/trip-01/location</code> ทุก 30–60 วินาที เพราะ GPS update จริงทุก 5–10 นาที</li>
+            <li><strong>Map fallback:</strong> MVP แสดงพิกัด + ปุ่ม “เปิดใน Google Maps” ก่อน; map marker/accuracy circle เป็น enhancement ภายหลัง</li>
+            <li><strong>Read-only safety:</strong> viewer token ต้อง POST ไม่ได้ และไม่เห็น owner token หรือข้อมูลที่ใช้ควบคุม session</li>
+          </ul>
+        </article>
+
+        <article class="decision">
+          <span class="tag green">Owner GPS detail</span>
+          <h3 style="margin-top:12px">สิ่งที่คุณต้องทำเพื่อเปิด GPS และเริ่มแชร์</h3>
+          <p>
+            การเปิด Location Services ของมือถืออย่างเดียวไม่พอ ระบบต้องให้คุณกด Start sharing ในหน้า <code>/trip-01</code> ก่อน จึงจะเริ่ม capture และส่งตำแหน่งออกไป
+          </p>
+          <ul>
+            <li>เปิด Location Services/GPS ของมือถือก่อนออกเดินทาง</li>
+            <li>เปิดหน้า <code>/trip-01</code> ผ่าน HTTPS แล้วกรอกรหัสหน้า trip</li>
+            <li>กด <strong>Start sharing</strong> ใน Live Location panel</li>
+            <li>เมื่อ browser ขอ permission ให้กดอนุญาตตำแหน่งแบบ “While using this site/app” หรือเทียบเท่า</li>
+            <li>เสียบ power bank/สายชาร์จ และเปิดหน้าไว้ถ้าต้องการให้ update น่าเชื่อถือที่สุด</li>
+            <li>กด <strong>Manual ping</strong> เมื่อถึงปั๊ม จุดพัก หรือมีเหตุฉุกเฉิน เพื่อส่งตำแหน่งทันทีนอกเหนือจากรอบ 5–10 นาที</li>
+            <li>เมื่อจบทริปหรือไม่อยากแชร์แล้ว กด <strong>Stop sharing</strong> เพื่อหยุด timer และ revoke/stop session</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Viewer state</th>
+              <th>เงื่อนไข</th>
+              <th>สิ่งที่ viewer เห็น</th>
+              <th>สิ่งที่ต้อง implement</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Loading</td>
+              <td>กำลังตรวจ token / fetch latest</td>
+              <td>Skeleton หรือข้อความ “กำลังโหลดตำแหน่งล่าสุด”</td>
+              <td>Abort/retry ได้ และไม่โชว์ error หลอกก่อน request จบ</td>
+            </tr>
+            <tr>
+              <td>Invalid / expired token</td>
+              <td>token ผิด, หมดอายุ, ถูก revoke</td>
+              <td>ข้อความ “ลิงก์นี้ใช้ไม่ได้หรือหมดอายุแล้ว” ไม่มีพิกัด</td>
+              <td>API คืน 401/403 และ UI ไม่ retry รัว</td>
+            </tr>
+            <tr>
+              <td>Waiting first GPS</td>
+              <td>session active แต่ยังไม่มี latest point</td>
+              <td>ข้อความ “เปิดแชร์แล้ว รอตำแหน่งแรกจากมือถือ”</td>
+              <td>poll ต่อทุก 30–60 วินาทีจนมี point หรือ session stopped</td>
+            </tr>
+            <tr>
+              <td>Fresh</td>
+              <td>latest age ≤ 15 นาที</td>
+              <td>badge สีเขียว, เวลาล่าสุด, พิกัด, accuracy, ปุ่ม Google Maps</td>
+              <td>คำนวณ age จาก server/client timestamp และ timezone-safe display</td>
+            </tr>
+            <tr>
+              <td>Stale</td>
+              <td>latest age &gt; 15 นาที และ ≤ 30 นาที</td>
+              <td>badge สีเหลือง “ข้อมูลเริ่มเก่า” พร้อมเวลาล่าสุดชัดเจน</td>
+              <td>ไม่แสดงเหมือน realtime; เพิ่มคำเตือนว่าอาจยังเดินทางอยู่แต่ยังไม่อัปเดต</td>
+            </tr>
+            <tr>
+              <td>Offline / not updating</td>
+              <td>latest age &gt; 30 นาที หรือ owner offline</td>
+              <td>badge สีแดง/เทา “ไม่ได้อัปเดต” และเก็บจุดล่าสุดไว้เป็น last known location</td>
+              <td>แยก last known location จาก current location ใน copy/UI</td>
+            </tr>
+            <tr>
+              <td>Stopped</td>
+              <td>owner กด Stop sharing หรือ session จบทริป</td>
+              <td>ข้อความ “หยุดแชร์แล้ว” พร้อม last known location ถ้ายังอนุญาตให้แสดง</td>
+              <td>หยุด polling หรือเปลี่ยนเป็น refresh manual เพื่อลด request</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Owner GPS UX</th>
+              <th>รายละเอียดที่ต้องมีใน Live Location panel</th>
+              <th>Error / fallback ที่ต้องแสดง</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ก่อนเริ่มแชร์</td>
+              <td>Checklist: เปิด GPS มือถือ, เปิดหน้านี้ผ่าน HTTPS, เตรียม power bank, อธิบายว่าเว็บอาจหยุดเมื่อ lock screen</td>
+              <td>ถ้า browser ไม่รองรับ Geolocation ให้ขึ้นว่า device/browser นี้ใช้ live location ไม่ได้</td>
+            </tr>
+            <tr>
+              <td>Permission prompt</td>
+              <td>กด Start แล้วค่อยเรียก <code>getCurrentPosition()</code> เพื่อให้ browser prompt หลัง user gesture</td>
+              <td>ถ้า denied ให้บอกวิธีไปเปิด permission ใน browser/site settings และให้ปุ่ม retry</td>
+            </tr>
+            <tr>
+              <td>กำลังแชร์</td>
+              <td>แสดง mode, next send countdown, last sent time, accuracy, upload status, wake lock status, viewer link/copy link</td>
+              <td>ถ้า upload fail ให้ retry และบอกว่า viewer ยังเห็น last known location</td>
+            </tr>
+            <tr>
+              <td>ระหว่างพัก</td>
+              <td>มีปุ่ม Rest mode เพื่อเปลี่ยน cadence เป็น 10–15 นาที และ Manual ping เมื่อถึงปั๊ม</td>
+              <td>ถ้า accuracy แย่ให้แสดง “ตำแหน่งคร่าว ๆ” แทนการ claim ว่าแม่น</td>
+            </tr>
+            <tr>
+              <td>จบทริป</td>
+              <td>ปุ่ม Stop sharing ต้องชัด, มี confirmation สั้น ๆ, แล้วแสดงสถานะหยุดแชร์สำเร็จ</td>
+              <td>ถ้า stop API fail ให้หยุด local timer ก่อนและ retry revoke จนสำเร็จ/แจ้งเตือน</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="phases">
+      <div class="section-head">
+        <p class="eyebrow">08 · Implementation phases</p>
+        <h2>ลำดับงานที่ต้องทำ</h2>
+      </div>
+
+      <div class="roadmap">
+        <article class="phase">
+          <div>
+            <h3>Branch setup & feature flag <span class="tag red">P0</span></h3>
+            <p>เริ่มงานบน <code>feat/gps</code>, เพิ่ม feature flag เพื่อให้ GPS panel ปิดได้ถ้า env ยังไม่พร้อม</p>
+            <ul>
+              <li>สร้าง/switch branch <code>feat/gps</code></li>
+              <li>เพิ่ม config helper เช่น <code>lib/trip-gps/config.ts</code></li>
+              <li>กำหนด default เป็น disabled เมื่อไม่มี env หรือไม่มี token</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Tracker panel บน /trip-01 <span class="tag red">P0</span></h3>
+            <p>เพิ่ม UI หลัง password gate เพื่อให้ rider เริ่ม/หยุดแชร์ตำแหน่งเองได้</p>
+            <ul>
+              <li>แยก component เช่น <code>app/trip-01/live-tracker.tsx</code></li>
+              <li>ปุ่ม Start sharing, Stop, Manual ping, Battery saver, Rest mode</li>
+              <li>แสดง owner GPS checklist ก่อนเริ่ม: เปิด Location Services/GPS, เปิดผ่าน HTTPS, เตรียม power bank, อย่าล็อกจอถ้าต้องการ update น่าเชื่อถือ</li>
+              <li>เรียก permission หลัง user กด Start เท่านั้น และแสดงวิธีแก้เมื่อ permission denied</li>
+              <li>แสดง permission, current mode, next send countdown, last sent, accuracy, upload status, wake lock status, viewer link/copy link, error</li>
+              <li>ใช้ <code>getCurrentPosition()</code> แบบ periodic snapshot: active 5 นาที, saver 10 นาที, rest 15 นาที</li>
+              <li>ขอ wake lock แบบ optional และแสดง warning เมื่อ page hidden หรือ screen lock อาจทำให้หยุดอัปเดต</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Location domain utilities <span class="tag red">P0</span></h3>
+            <p>แยก logic ที่ test/verify ได้ออกจาก UI</p>
+            <ul>
+              <li><code>lib/trip-gps/types.ts</code>: payload/session/viewer types</li>
+              <li><code>lib/trip-gps/cadence.ts</code>: interval per mode, stale/offline calculation</li>
+              <li><code>lib/trip-gps/geo.ts</code>: accuracy validation, haversine optional, coordinate sanitization</li>
+              <li><code>lib/trip-gps/client.ts</code>: upload function + retry/offline queue skeleton</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>API route สำหรับ ingest/latest <span class="tag orange">P1</span></h3>
+            <p>สร้าง backend boundary ใน Next App Router ก่อนผูก provider จริง</p>
+            <ul>
+              <li><code>app/api/trips/trip-01/location/route.ts</code> รองรับ <code>POST</code> owner upload และ <code>GET</code> viewer latest</li>
+              <li>ตรวจ token, session active, expiry, rate limit, payload shape</li>
+              <li>ตอบ structured errors: 400 invalid payload, 401 invalid token, 403 inactive/revoked, 429 too frequent</li>
+              <li>เริ่มด้วย in-memory/mock adapter เฉพาะ dev ถ้า database credential ยังไม่มี</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Storage provider integration <span class="tag orange">P1</span></h3>
+            <p>ผูก Supabase Postgres เป็น provider หลัก เพราะตรงกับ relational session/latest/history model; Firebase เก็บเป็น backup option เฉพาะกรณีเปลี่ยนโจทย์ไปเน้น managed realtime listener</p>
+            <ul>
+              <li>สร้าง adapter interface เช่น <code>LocationStore</code></li>
+              <li>Supabase tables: <code>trip_share_sessions</code>, <code>trip_location_latest</code>, <code>trip_location_points</code></li>
+              <li>เปิด RLS หรือบังคับอ่าน/เขียนผ่าน server route เท่านั้น</li>
+              <li>เพิ่ม cleanup/retention script หรือ documented SQL สำหรับลบ history หลัง 24–72 ชม.</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Viewer page <span class="tag orange">P1</span></h3>
+            <p>ทำหน้าสำหรับคนรู้จักดูตำแหน่งล่าสุดแบบ read-only</p>
+            <ul>
+              <li>เพิ่ม <code>app/trip-01/live/page.tsx</code> และ client component สำหรับ polling/realtime</li>
+              <li>รับ viewer token จาก query param หรือ path token และตรวจผ่าน API ก่อนแสดงข้อมูล</li>
+              <li>รองรับ states: invalid/expired token, waiting first GPS, fresh, stale, offline, stopped</li>
+              <li>แสดง latest point, timestamp, age, stale/offline state, accuracy, speed optional และข้อความ “last known location” เมื่อข้อมูลเก่า</li>
+              <li>แสดง route stops เดิม + ปุ่มเปิด Google Maps ไปยังจุดล่าสุด + ปุ่ม refresh manual</li>
+              <li>poll ทุก 30–60 วินาที และหยุด/ลด polling เมื่อ session stopped หรือ token invalid</li>
+              <li>ถ้าเลือก map dependency แล้ว ค่อยเพิ่ม marker/accuracy circle/polyline</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Cloudflare edge protection + analytics <span class="tag orange">P1</span></h3>
+            <p>ตั้งค่า Cloudflare ที่ dashboard/domain level ให้รองรับ GPS feature โดยไม่เพิ่ม backend server แยก</p>
+            <ul>
+              <li>เปิด DNS proxy/orange cloud สำหรับ hostname ที่ serve เว็บจริง และยืนยันว่า Vercel origin ยังตอบ HTTPS ได้</li>
+              <li>สร้าง WAF/rate limiting rules สำหรับ <code>/api/trips/trip-01/location*</code> และ session endpoints</li>
+              <li>ตั้ง cache bypass/no-store สำหรับ location API และ viewer latest response</li>
+              <li>เพิ่ม Web Analytics เฉพาะ non-sensitive pages; ไม่ฝังบน viewer URL ที่มี token/query</li>
+              <li>บันทึก rule names/thresholds ใน deployment notes เพื่อ rollback/debug ได้</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Security & token lifecycle <span class="tag orange">P1</span></h3>
+            <p>ทำให้แชร์ได้เฉพาะคนที่มีลิงก์ และหยุดแชร์ได้ทันที</p>
+            <ul>
+              <li>owner token ส่งตำแหน่งได้เท่านั้น; viewer token อ่านได้เท่านั้น</li>
+              <li>เก็บ token เป็น hash ฝั่ง server/database ไม่เก็บ plain token</li>
+              <li>session มี <code>expires_at</code>, <code>revoked_at</code>, <code>stopped_at</code></li>
+              <li>Stop sharing ต้อง revoke/mark inactive และ viewer เห็นสถานะหยุดแชร์</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Reliability for real trip <span class="tag violet">P2</span></h3>
+            <p>เพิ่มความทนทานก่อนใช้งานจริงบนถนนยาว</p>
+            <ul>
+              <li>offline queue เก็บ point ล่าสุด 1–3 จุดใน memory/localStorage แล้ว flush เมื่อ online</li>
+              <li>UI เตือนเมื่อ page hidden, permission denied, accuracy แย่, upload fail ต่อเนื่อง</li>
+              <li>mode shortcut: Active / Saver / Rest / City approach</li>
+              <li>audit แบบเบา: last viewer access, upload count, last error</li>
+            </ul>
+          </div>
+        </article>
+
+        <article class="phase">
+          <div>
+            <h3>Native tracker spike <span class="tag blue">Future</span></h3>
+            <p>ทำเฉพาะถ้า Web MVP พิสูจน์แล้วว่ายังไม่พอ เพราะต้องการส่งตำแหน่งตอน lock screen จริง</p>
+            <ul>
+              <li>ประเมิน Capacitor/React Native companion app</li>
+              <li>ใช้ endpoint/API เดิมของ viewer ต่อได้</li>
+              <li>เพิ่ม background location permission และ platform policy handling</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="files">
+      <div class="section-head">
+        <p class="eyebrow">09 · File impact</p>
+        <h2>ไฟล์ที่คาดว่าจะสร้าง/แก้</h2>
+      </div>
+
+      <div class="four-grid">
+        <article class="file-card">
+          <h3>Trip page UI</h3>
+          <p><code>app/trip-01/trip-client.tsx</code><br /><code>app/trip-01/trip.module.css</code><br /><code>app/trip-01/live-tracker.tsx</code></p>
+          <small>เพิ่ม panel และ styling โดยไม่ทำให้ route plan เดิมอ่านยาก</small>
+        </article>
+        <article class="file-card">
+          <h3>Viewer route</h3>
+          <p><code>app/trip-01/live/page.tsx</code><br /><code>app/trip-01/live/live-viewer.tsx</code><br /><code>app/trip-01/live/live.module.css</code></p>
+          <small>แยก viewer read-only ออกจาก private roadbook หลัก</small>
+        </article>
+        <article class="file-card">
+          <h3>API</h3>
+          <p><code>app/api/trips/trip-01/location/route.ts</code><br /><code>app/api/trips/trip-01/session/route.ts</code> optional</p>
+          <small>Route Handler สำหรับ upload/latest/session lifecycle</small>
+        </article>
+        <article class="file-card">
+          <h3>Cloudflare config notes</h3>
+          <p><code>plans/feature-gps/plan-gps-tracking.html</code><br />Cloudflare dashboard rules</p>
+          <small>WAF/rate limit/cache/analytics เป็น dashboard-level config; ถ้าทำ automation ภายหลังค่อยเพิ่ม Wrangler/Terraform</small>
+        </article>
+        <article class="file-card">
+          <h3>Domain logic</h3>
+          <p><code>lib/trip-gps/types.ts</code><br /><code>lib/trip-gps/cadence.ts</code><br /><code>lib/trip-gps/store.ts</code><br /><code>lib/trip-gps/token.ts</code></p>
+          <small>แยก logic เพื่อทดสอบและลด client bundle</small>
+        </article>
+      </div>
+    </section>
+
+    <section id="data">
+      <div class="section-head">
+        <p class="eyebrow">10 · Data & API contract</p>
+        <h2>สัญญาข้อมูลที่ควรกำหนดก่อน coding</h2>
+      </div>
+
+      <div class="two-grid">
+        <article class="card">
+          <h3>Owner upload payload</h3>
+          <pre><code>POST /api/trips/trip-01/location
+Authorization: Bearer &lt;owner-token&gt;
+
+{
+  "sessionId": "trip01_2026_...",
+  "seq": 42,
+  "lat": 13.5361776,
+  "lng": 100.2209807,
+  "accuracyM": 24,
+  "speedMps": 18.4,
+  "headingDeg": 12,
+  "clientTs": "2026-06-28T10:29:42.120Z",
+  "mode": "active",
+  "reason": "scheduled"
+}</code></pre>
+        </article>
+        <article class="card">
+          <h3>Viewer latest response</h3>
+          <pre><code>GET /api/trips/trip-01/location?t=&lt;viewer-token&gt;
+
+{
+  "status": "active",
+  "freshness": "fresh",
+  "viewerState": "fresh",
+  "latest": {
+    "lat": 13.5361776,
+    "lng": 100.2209807,
+    "accuracyM": 24,
+    "clientTs": "2026-06-28T10:29:42.120Z",
+    "serverTs": "2026-06-28T10:29:44.010Z"
+  },
+  "nextPollMs": 60000,
+  "message": "ตำแหน่งล่าสุดยังสด"
+}</code></pre>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Table / document</th>
+              <th>Purpose</th>
+              <th>Minimum fields</th>
+              <th>Retention</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>trip_share_sessions</code></td>
+              <td>ควบคุม session แชร์ตำแหน่ง</td>
+              <td><code>id</code>, <code>trip_id</code>, <code>active</code>, <code>expires_at</code>, <code>revoked_at</code>, token hashes</td>
+              <td>เก็บได้จนจบทริป + audit สั้น ๆ</td>
+            </tr>
+            <tr>
+              <td><code>trip_location_latest</code></td>
+              <td>อ่านจุดล่าสุดเร็ว</td>
+              <td><code>session_id</code>, lat/lng, accuracy, mode, reason, client/server ts</td>
+              <td>ลบเมื่อ session หมดอายุหรือหยุดแชร์</td>
+            </tr>
+            <tr>
+              <td><code>trip_location_points</code></td>
+              <td>history สำหรับ polyline/debug</td>
+              <td>เหมือน latest + <code>seq</code></td>
+              <td>24–72 ชม. แล้วลบ</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="acceptance">
+      <div class="section-head">
+        <p class="eyebrow">11 · Acceptance criteria</p>
+        <h2>เกณฑ์รับงานที่ทดสอบได้</h2>
+      </div>
+
+      <div class="check-grid">
+        <article class="verify-card">
+          <h3>Functional</h3>
+          <ul class="checklist">
+            <li>บน branch <code>feat/gps</code> มี tracker panel ใน <code>/trip-01</code> หลังปลดรหัสเท่านั้น</li>
+            <li>กด Start แล้ว browser ขอ permission และส่งตำแหน่งแรกทันทีเมื่ออนุญาต</li>
+            <li>active mode schedule ถัดไปทุก 5 นาที; saver mode ทุก 10 นาที; manual ping ส่งทันที</li>
+            <li>กด Stop แล้วหยุด timer, clear watch/lock ที่มี, และ mark session inactive/revoked</li>
+            <li>viewer token valid อ่าน latest location ได้; invalid token อ่านไม่ได้</li>
+            <li>viewer แสดง states ครบ: loading, invalid/expired, waiting first GPS, fresh, stale, offline, stopped</li>
+            <li>viewer แสดง stale เมื่อ latest เกิน 15 นาที และ offline เมื่อเกิน 30 นาที</li>
+            <li>owner panel มี checklist เปิด GPS/Location Services, permission retry, viewer link copy, Start/Stop/Manual ping/Rest mode</li>
+            <li>owner กด Start เท่านั้นจึงเรียก permission และเริ่มส่งตำแหน่ง; ก่อนกด Start ไม่มีการส่ง location ออกไป</li>
+            <li>Cloudflare DNS proxy เปิดสำหรับ hostname เว็บจริง และ API location ไม่ถูก cache</li>
+            <li>Cloudflare WAF/rate limiting ไม่บล็อก viewer polling ปกติ แต่ challenge/block request burst ที่ผิดปกติ</li>
+            <li>Web Analytics ไม่ถูกฝังบน viewer URL ที่มี token/query หรือมีแผน sanitize URL ก่อน track</li>
+          </ul>
+        </article>
+        <article class="verify-card">
+          <h3>Quality / security</h3>
+          <ul class="checklist">
+            <li>ไม่มี server secret/service role key ใน client bundle หรือ <code>NEXT_PUBLIC_*</code></li>
+            <li>payload validation ปฏิเสธ lat/lng นอก range, accuracy ติดลบ, timestamp invalid</li>
+            <li>rate limit ป้องกัน upload ถี่ผิดปกติ เช่นถี่กว่า 30 วินาที ยกเว้น manual/debug ที่กำหนด</li>
+            <li>history retention ถูก document หรือมี cleanup job/script</li>
+            <li><code>npm run lint</code> และ <code>npm run build</code> ผ่านก่อนจบงาน</li>
+            <li>ถ้าไม่สามารถทดสอบบนมือถือจริงได้ ต้องระบุ validation gap ชัดเจน</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="verification">
+      <div class="section-head">
+        <p class="eyebrow">12 · Verification plan</p>
+        <h2>วิธีตรวจงานก่อน merge</h2>
+      </div>
+
+      <div class="three-grid">
+        <article class="verify-card">
+          <span class="score green">A</span>
+          <h3>Static verification</h3>
+          <ul>
+            <li><code>npm run lint</code></li>
+            <li><code>npm run build</code></li>
+            <li>ตรวจว่า route handlers ไม่ cache latest location ผิดพลาด</li>
+            <li>ตรวจว่า env names แยก public/server-only ถูกต้อง</li>
+            <li>ตรวจ response headers/API behavior ว่า location API เป็น dynamic/no-store และไม่ถูก Cloudflare cache</li>
+            <li>ตรวจ Cloudflare rule preview/logs ว่า WAF/rate limiting match เฉพาะ endpoint ที่ตั้งใจ</li>
+          </ul>
+        </article>
+        <article class="verify-card">
+          <span class="score orange">B</span>
+          <h3>Browser/device verification</h3>
+          <ul>
+            <li>ทดสอบ Chrome/Safari บนมือถือจริงผ่าน HTTPS preview</li>
+            <li>permission allow/deny/error path และวิธี retry หลังเปิด permission ใหม่</li>
+            <li>owner flow: ก่อน Start ไม่ส่งตำแหน่ง, หลัง Start ส่งทันที, Manual ping ส่งทันที, Stop หยุด sharing</li>
+            <li>viewer flow: valid token เห็นข้อมูล, invalid/expired token ไม่เห็นพิกัด, waiting/fresh/stale/offline/stopped แสดงถูกต้อง</li>
+            <li>page hidden warning และ wake lock fallback</li>
+            <li>ปิดเน็ตแล้วกลับมา online เพื่อดู retry/offline queue</li>
+          </ul>
+        </article>
+        <article class="verify-card">
+          <span class="score violet">C</span>
+          <h3>Security verification</h3>
+          <ul>
+            <li>owner token ใช้ GET viewer ไม่ได้ถ้าแยก policy ไว้</li>
+            <li>viewer token POST ไม่ได้</li>
+            <li>expired/revoked token ถูก reject</li>
+            <li>Stop sharing ทำให้ viewer เห็น stopped state</li>
+            <li>ทดสอบว่า viewer token ไม่ถูกส่งเข้า analytics beacon/network request ที่ไม่จำเป็น</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="risks">
+      <div class="section-head">
+        <p class="eyebrow">13 · Risks & mitigations</p>
+        <h2>ความเสี่ยงที่ต้องคุม</h2>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Risk</th>
+              <th>Impact</th>
+              <th>Mitigation</th>
+              <th>Owner check</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Browser หยุดส่งเมื่อจอล็อก/แท็บถูก suspend</td>
+              <td>Viewer เห็นตำแหน่งเก่า</td>
+              <td>แสดงคำเตือน, wake lock optional, stale/offline UI, ยอมรับเป็น Web MVP boundary</td>
+              <td>ทดสอบมือถือจริง</td>
+            </tr>
+            <tr>
+              <td>ลิงก์ viewer ถูก forward</td>
+              <td>คนอื่นเห็นตำแหน่ง</td>
+              <td>token หมดอายุ, revoke ได้, ไม่แสดงข้อมูลเกินจำเป็น, coarse mode optional</td>
+              <td>ทดสอบ revoke/expiry</td>
+            </tr>
+            <tr>
+              <td>Service key หลุด client</td>
+              <td>DB ถูกอ่าน/เขียนผิดสิทธิ์</td>
+              <td>server-only env, route handler boundary, scan code for <code>NEXT_PUBLIC</code> misuse</td>
+              <td>review bundle/env usage</td>
+            </tr>
+            <tr>
+              <td>Cloudflare WAF/rate limit false positive</td>
+              <td>viewer หรือ owner upload ถูก block ระหว่างทริป</td>
+              <td>ตั้ง threshold สูงกว่า polling/upload ปกติ, มี bypass/debug plan, และ API server-side validation ยังทำงานเองได้</td>
+              <td>ทดสอบ rule ก่อนทริปจริง</td>
+            </tr>
+            <tr>
+              <td>Analytics เก็บ viewer token โดยไม่ตั้งใจ</td>
+              <td>ลิงก์ private location อาจหลุดเข้า analytics/log</td>
+              <td>ไม่ฝัง Web Analytics บน viewer URL ที่มี token/query; ใช้ sanitized route หรือ internal view counter แทน</td>
+              <td>ตรวจ network request ของ viewer page</td>
+            </tr>
+            <tr>
+              <td>เพิ่ม map/realtime dependency เร็วเกินไป</td>
+              <td>งานบานและค่าใช้จ่ายเพิ่ม</td>
+              <td>MVP ใช้ coordinates + Google Maps link ก่อน; dependency gate แยกเป็น decision</td>
+              <td>ตรวจ package diff</td>
+            </tr>
+            <tr>
+              <td>GPS accuracy แย่ในเมือง/ใต้หลังคา</td>
+              <td>ตำแหน่งดูผิด</td>
+              <td>แสดง accuracy circle/ข้อความ, ไม่ลากเส้นจาก point ที่ accuracy แย่</td>
+              <td>mock bad accuracy</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="handoff">
+      <div class="section-head">
+        <p class="eyebrow">14 · Execution handoff</p>
+        <h2>คำแนะนำตอนนำแผนไปทำต่อ</h2>
+      </div>
+
+      <div class="two-grid">
+        <article class="callout blue">
+          <strong>แนะนำ execution lane:</strong>
+          งานนี้ทำแบบ solo executor ได้ถ้าเริ่มจาก MVP เฉพาะ tracker+viewer polling แต่ถ้าจะทำ Supabase/RLS/map พร้อมกัน ให้แบ่ง lane เป็น frontend, API/storage, security verification
+        </article>
+        <article class="callout ok">
+          <strong>Stop condition:</strong>
+          หยุดเมื่อ acceptance criteria ผ่าน, build/lint ผ่าน, viewer เปิดดู latest location ได้ด้วย token, และเอกสารระบุข้อจำกัด background tracking ชัดเจน
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Lane</th>
+              <th>Role ที่เหมาะ</th>
+              <th>งาน</th>
+              <th>Evidence ที่ต้องส่งกลับ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Frontend tracker/viewer</td>
+              <td><code>executor</code> + <code>designer</code> optional</td>
+              <td>Trip panel, viewer page, stale UI, responsive/mobile UX</td>
+              <td>ไฟล์ที่แก้, screenshots/manual test, lint/build</td>
+            </tr>
+            <tr>
+              <td>API/storage</td>
+              <td><code>executor</code> หรือ <code>debugger</code> ถ้า integration fail</td>
+              <td>Route handlers, adapter, validation, mock/Supabase provider</td>
+              <td>curl/API test cases, invalid token proof, data shape</td>
+            </tr>
+            <tr>
+              <td>Security/QA</td>
+              <td><code>verifier</code> / <code>code-reviewer</code></td>
+              <td>token policy, secret exposure, stale/offline edge cases</td>
+              <td>review findings + pass/fail matrix</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <footer>
+        <p>
+          <strong>Plan branch:</strong> <code>feat/gps</code>. เอกสารนี้เป็นแผนเท่านั้น ยังไม่ได้ implement ฟีเจอร์และยังไม่ได้ switch branch ให้จริง
+          เพื่อไม่แตะ git state ที่มีงานค้างอยู่บน <code>develop</code>.
+        </p>
+      </footer>
+    </section>
+  </main>
+</body>
+</html>

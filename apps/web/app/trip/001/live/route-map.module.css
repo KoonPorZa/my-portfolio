@@ -1,0 +1,230 @@
+.mapFrame {
+  position: relative;
+  height: 340px;
+  margin-top: 15px;
+  border: 1.5px solid var(--line-strong, #cdbd9c);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #e9edf0;
+  box-shadow: var(--shadow, 0 18px 44px -26px rgba(54, 35, 12, 0.55));
+  isolation: isolate;
+}
+
+@media (min-width: 560px) {
+  .mapFrame {
+    height: 400px;
+  }
+}
+
+.map {
+  height: 100%;
+  width: 100%;
+}
+
+.mapLoading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--muted, #8c7d63);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+}
+
+.routeSourceBadge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  max-width: min(calc(100% - 24px), 320px);
+  padding: 7px 10px;
+  border: 1px solid rgba(205, 189, 156, 0.82);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.92);
+  color: var(--ink, #241c13);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  box-shadow: 0 7px 18px rgba(54, 35, 12, 0.14);
+  pointer-events: none;
+}
+
+.routeLegend {
+  position: absolute;
+  left: 12px;
+  bottom: 28px;
+  z-index: 2;
+  display: flex;
+  max-width: min(calc(100% - 24px), 360px);
+  flex-wrap: wrap;
+  gap: 7px;
+  pointer-events: none;
+}
+
+.routeLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 27px;
+  padding: 5px 9px;
+  border: 1px solid rgba(205, 189, 156, 0.82);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.9);
+  color: var(--ink, #241c13);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 7px 18px rgba(54, 35, 12, 0.12);
+}
+
+.routeLegend i {
+  display: block;
+  width: 18px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.plannedSwatch {
+  background: var(--accent, #cf451c);
+}
+
+.actualSwatch {
+  background: #057f73;
+}
+
+/* Keep MapLibre's UI legible against the warm paper theme */
+.mapFrame :global(.maplibregl-ctrl-attrib) {
+  font-size: 10px;
+}
+
+/* Numbered stop pin */
+.stopPin {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fbf6ec;
+  border: 2px solid var(--accent, #cf451c);
+  color: var(--accent-deep, #a4330f);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 2px 7px rgba(54, 35, 12, 0.35);
+  transition: transform 140ms ease;
+}
+
+.stopPin:hover {
+  transform: scale(1.12);
+  z-index: 2;
+}
+
+/* Terminal stops (start / finish) get a filled accent chip */
+.stopPinMajor {
+  background: var(--accent, #cf451c);
+  border-color: var(--accent-deep, #a4330f);
+  color: #fff6f0;
+}
+
+/* Pulsing live-location marker */
+.livePin {
+  position: relative;
+  width: 20px;
+  height: 20px;
+}
+
+.livePinDot {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #cf451c);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1.5px var(--accent-deep, #a4330f), 0 3px 8px rgba(54, 35, 12, 0.45);
+  z-index: 2;
+}
+
+.livePinRing {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent, #cf451c);
+  opacity: 0.55;
+  animation: livePulse 1.9s ease-out infinite;
+}
+
+@keyframes livePulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .livePinRing {
+    animation: none;
+    opacity: 0;
+  }
+
+  .stopPin {
+    transition: none;
+  }
+}
+
+/* ── Phase 17: Google map toggle bar (rendered only when flag is ON) ──────── */
+
+.mapToggleBar {
+  display: flex;
+  gap: 8px;
+  margin-top: 15px;
+  margin-bottom: 8px;
+}
+
+.mapToggle,
+.mapToggleActive {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1.5px solid var(--line-strong, #cdbd9c);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.7);
+  color: var(--ink, #241c13);
+  font-family: var(--trip-mono, ui-monospace, monospace);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  text-align: center;
+}
+
+.mapToggleActive {
+  background: var(--accent, #cf451c);
+  border-color: var(--accent-deep, #a4330f);
+  color: #fff6f0;
+}
+
+.mapToggle:hover {
+  background: rgba(207, 69, 28, 0.08);
+  border-color: var(--accent, #cf451c);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapToggle,
+  .mapToggleActive {
+    transition: none;
+  }
+}

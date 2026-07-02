@@ -1,0 +1,24 @@
+services:
+  trip-gps-api:
+    # Built locally on por-dev by deploy/trip-gps-api/deploy.sh (no registry).
+    image: trip-gps-api:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env
+    expose:
+      - "3000"
+    healthcheck:
+      # Runs inside the container; the API listens on 0.0.0.0:3000. Keep this
+      # port aligned with the container's PORT / the Dockerfile EXPOSE.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks:
+      - npm
+
+networks:
+  npm:
+    external: true
+    name: nginx-proxy-manager_default

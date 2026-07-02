@@ -1,0 +1,228 @@
+.card {
+  position: relative;
+  overflow: hidden;
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius, 18px);
+  background:
+    linear-gradient(135deg, rgba(251, 246, 236, 0.96), rgba(246, 238, 221, 0.96)),
+    repeating-linear-gradient(90deg, transparent 0 18px, rgba(207, 69, 28, 0.055) 18px 19px);
+  box-shadow: var(--shadow-soft);
+  padding: 17px;
+  color: var(--ink-soft);
+  font-family: var(--trip-sans);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.kicker,
+.statusBadge,
+.condition,
+.loadingText,
+.metrics,
+.meta {
+  font-family: var(--trip-mono);
+}
+
+.kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 7px 0 0;
+  color: var(--ink);
+  font-size: clamp(1.35rem, 5.4vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.08;
+}
+
+.statusBadge {
+  flex: 0 0 auto;
+  border: 1.5px solid #cfe1c4;
+  border-radius: 999px;
+  background: var(--rest-tint);
+  padding: 4px 9px;
+  color: var(--rest);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.stateBox {
+  margin-top: 15px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(251, 246, 236, 0.72);
+  padding: 14px;
+}
+
+.stateBoxDashed {
+  border-style: dashed;
+  border-color: var(--line-strong);
+}
+
+.errorBox {
+  border-color: #e7bdb6;
+  background: var(--danger-tint);
+}
+
+.stateTitle {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.96rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.stateCopy {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.loadingText {
+  margin: 0;
+  color: var(--accent-deep);
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 13px;
+}
+
+.skeletonGrid span {
+  display: block;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--card-2), rgba(251, 246, 236, 0.58));
+}
+
+.current {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 16px;
+  border-bottom: 1px dashed var(--line-strong);
+  padding-bottom: 15px;
+}
+
+.condition {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.temperature {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-family: var(--trip-mono);
+  font-size: clamp(2.35rem, 12vw, 3.1rem);
+  font-weight: 800;
+  letter-spacing: 0;
+  line-height: 0.95;
+}
+
+.temperatureUnit {
+  color: var(--muted);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.weatherIcon {
+  flex: 0 0 auto;
+  font-size: 2.35rem;
+  line-height: 1;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin: 14px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--line);
+}
+
+.metricCell {
+  min-width: 0;
+  background: var(--card);
+  padding: 12px;
+}
+
+.metricLabel {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.metricValue {
+  margin: 4px 0 0;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  font-size: 0.92rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.meta {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.toneClear {
+  color: var(--rest);
+}
+
+.toneCloud,
+.toneFog {
+  color: var(--muted);
+}
+
+.toneRain {
+  color: var(--accent);
+}
+
+.toneStorm {
+  color: var(--danger);
+}
+
+@media (max-width: 520px) {
+  .header {
+    flex-direction: column;
+  }
+
+  .statusBadge {
+    align-self: flex-start;
+  }
+}

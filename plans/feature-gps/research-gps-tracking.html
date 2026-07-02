@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Research: GPS Tracking สำหรับ Trip 01</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #fbf6ec;
+      --paper-strong: #f2e5cf;
+      --ink: #1d2433;
+      --muted: #667085;
+      --line: #dacbb4;
+      --card: #fffdf7;
+      --blue: #114d8b;
+      --blue-2: #0b355f;
+      --amber: #b45309;
+      --green: #166534;
+      --red: #9f1239;
+      --violet: #5b21b6;
+      --shadow: 0 20px 60px rgba(65, 48, 22, 0.12);
+      --radius: 26px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(180, 83, 9, 0.18), transparent 34rem),
+        radial-gradient(circle at 85% 0%, rgba(17, 77, 139, 0.16), transparent 32rem),
+        linear-gradient(180deg, #fffaf0 0%, var(--paper) 42%, #f7ecda 100%);
+      color: var(--ink);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Thai", "Noto Sans", sans-serif;
+      line-height: 1.72;
+      text-rendering: optimizeLegibility;
+    }
+
+    a { color: var(--blue-2); text-underline-offset: 0.2em; }
+    code, pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    pre {
+      margin: 14px 0 0;
+      padding: 18px;
+      overflow: auto;
+      border-radius: 18px;
+      border: 1px solid rgba(17, 77, 139, 0.18);
+      background: #111827;
+      color: #e5f2ff;
+      font-size: 0.88rem;
+      line-height: 1.55;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 32px 0 64px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+      align-items: stretch;
+      padding: 28px 0 20px;
+    }
+
+    .hero-card,
+    .toc,
+    .card,
+    .source-card,
+    .diagram,
+    .callout,
+    .score-card {
+      border: 1px solid var(--line);
+      background: rgba(255, 253, 247, 0.92);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(26px, 6vw, 58px);
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: auto -12% -42% 48%;
+      height: 340px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(17, 77, 139, 0.18), transparent 64%);
+      pointer-events: none;
+    }
+
+    .kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      width: fit-content;
+      margin: 0 0 18px;
+      border: 1px solid rgba(17, 77, 139, 0.22);
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(17, 77, 139, 0.08);
+      color: var(--blue-2);
+      font-size: 0.76rem;
+      font-weight: 850;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 { color: var(--ink); line-height: 1.08; }
+    h1 {
+      max-width: 950px;
+      margin: 0;
+      font-size: clamp(2.5rem, 8vw, 6.5rem);
+      letter-spacing: -0.07em;
+      font-weight: 900;
+    }
+    .subtitle {
+      max-width: 850px;
+      margin: 22px 0 0;
+      color: #334155;
+      font-size: clamp(1rem, 2.4vw, 1.25rem);
+    }
+
+    .meta-grid,
+    .quick-grid,
+    .two-grid,
+    .three-grid,
+    .decision-grid,
+    .flow-grid,
+    .db-grid,
+    .risk-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .meta-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 26px;
+    }
+
+    .pill, .tag {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      border-radius: 999px;
+      border: 1px solid rgba(29, 36, 51, 0.12);
+      padding: 5px 10px;
+      background: #fff7e8;
+      color: #5f3b08;
+      font-weight: 800;
+      font-size: 0.78rem;
+      line-height: 1.3;
+    }
+
+    .meta {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: rgba(255,255,255,0.58);
+      padding: 16px;
+    }
+    .meta b { display: block; font-size: 1.05rem; }
+    .meta span { display: block; color: var(--muted); font-size: 0.92rem; }
+
+    .toc {
+      padding: 18px;
+      margin: 18px 0 26px;
+    }
+    .toc h2 { margin: 0 0 12px; font-size: 1rem; letter-spacing: 0.02em; }
+    .toc ol {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      margin: 0;
+      padding-left: 1.3rem;
+    }
+
+    section { padding: 32px 0; scroll-margin-top: 18px; }
+    .section-head { margin-bottom: 18px; }
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--blue-2);
+      font-size: 0.78rem;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    h2 { margin: 0; font-size: clamp(1.8rem, 4.6vw, 3.4rem); letter-spacing: -0.05em; }
+    .lead { max-width: 860px; margin: 12px 0 0; color: #3f4d63; font-size: 1.03rem; }
+
+    .quick-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .two-grid, .decision-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .three-grid, .risk-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .flow-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .db-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .card, .source-card, .score-card {
+      padding: 20px;
+    }
+    .card h3, .source-card h3, .score-card h3 { margin: 0 0 10px; font-size: 1.24rem; letter-spacing: -0.025em; }
+    .card p, .source-card p, .score-card p { margin: 0; color: #41506a; }
+    .card ul, .card ol { margin: 10px 0 0; padding-left: 1.2rem; color: #41506a; }
+
+    .hero-answer {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .answer-big {
+      border-radius: 28px;
+      padding: 24px;
+      background: linear-gradient(135deg, var(--blue-2), #1d4ed8);
+      color: white;
+      box-shadow: 0 24px 55px rgba(17, 77, 139, 0.28);
+    }
+    .answer-big h2, .answer-big p { color: white; }
+    .answer-big h2 { margin: 0 0 10px; font-size: clamp(1.7rem, 3.8vw, 3.4rem); }
+    .answer-big p { margin: 0; opacity: 0.92; }
+
+    .answer-small {
+      border-radius: 28px;
+      padding: 24px;
+      background: #fffdf7;
+      border: 1px solid var(--line);
+    }
+    .answer-small strong { color: var(--red); }
+
+    .diagram {
+      padding: 22px;
+      overflow: hidden;
+    }
+    .flow-step {
+      position: relative;
+      min-height: 150px;
+      border-radius: 20px;
+      border: 1px solid rgba(17, 77, 139, 0.14);
+      background: linear-gradient(180deg, #ffffff, #fff8ed);
+      padding: 16px;
+    }
+    .flow-step::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -18px;
+      transform: translateY(-50%);
+      z-index: 2;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--blue-2);
+      color: white;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+    }
+    .flow-step:last-child::after { display: none; }
+    .flow-step b { display: block; margin-bottom: 8px; color: var(--blue-2); }
+    .flow-step p { margin: 0; color: #45546e; font-size: 0.92rem; }
+
+    .callout {
+      padding: 20px;
+      background: #fff7e8;
+    }
+    .callout strong { color: #8a3d05; }
+    .callout.danger { background: #fff1f2; border-color: rgba(159, 18, 57, 0.24); }
+    .callout.danger strong { color: var(--red); }
+    .callout.ok { background: #effdf4; border-color: rgba(22, 101, 52, 0.24); }
+    .callout.ok strong { color: var(--green); }
+    .callout.blue { background: #eff6ff; border-color: rgba(17, 77, 139, 0.24); }
+    .callout.blue strong { color: var(--blue-2); }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,253,247,0.88);
+      box-shadow: var(--shadow);
+    }
+    table { width: 100%; border-collapse: collapse; min-width: 820px; }
+    th, td { padding: 14px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid rgba(218,203,180,0.8); }
+    th { color: var(--blue-2); background: #f7ead6; font-size: 0.86rem; letter-spacing: 0.04em; text-transform: uppercase; }
+    tr:last-child td { border-bottom: 0; }
+    td { color: #3e4b63; }
+
+    .score {
+      display: inline-grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      background: var(--blue-2);
+      color: white;
+      font-weight: 900;
+    }
+    .score.warn { background: var(--amber); }
+    .score.bad { background: var(--red); }
+    .score.good { background: var(--green); }
+    .score.violet { background: var(--violet); }
+
+    .timeline {
+      display: grid;
+      gap: 12px;
+      counter-reset: step;
+    }
+    .timeline-item {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 58px 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+    .timeline-item::before {
+      content: counter(step, decimal-leading-zero);
+      display: grid;
+      place-items: center;
+      border-radius: 18px;
+      background: var(--blue-2);
+      color: white;
+      font-weight: 900;
+      min-height: 58px;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 12px;
+    }
+    .source-card small {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .repo-note {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .repo-line {
+      border-radius: 16px;
+      border: 1px solid rgba(17,77,139,0.14);
+      background: #f8fbff;
+      padding: 12px;
+      color: #39475f;
+    }
+
+    footer {
+      margin-top: 40px;
+      padding: 24px;
+      border-radius: 26px;
+      background: #172033;
+      color: #e5e7eb;
+    }
+    footer a { color: #bfdbfe; }
+    footer p { margin: 0; }
+
+    @media (max-width: 980px) {
+      .quick-grid, .three-grid, .risk-grid, .flow-grid, .db-grid, .hero-answer { grid-template-columns: 1fr; }
+      .two-grid, .decision-grid { grid-template-columns: 1fr; }
+      .flow-step::after { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      .page { width: min(100% - 20px, 1180px); padding-top: 18px; }
+      .hero-card, .card, .source-card, .diagram, .callout, .score-card { border-radius: 20px; }
+      .meta-grid { grid-template-columns: 1fr; }
+      .timeline-item { grid-template-columns: 1fr; }
+      .timeline-item::before { width: 58px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero" id="top">
+      <div class="hero-card">
+        <span class="kicker">Research · GPS Tracking · Trip 01</span>
+        <h1>Live Location สำหรับหน้า /trip-01 ทำเองได้ไหม?</h1>
+        <p class="subtitle">
+          สรุปแนวทางทำระบบให้คนรู้จักเปิดดูตำแหน่งระหว่างทริป สงขลา → กรุงเทพฯ ได้เกือบ realtime
+          หรืออัปเดตตามระยะ/เวลา โดยยึดจาก Web Geolocation, realtime transport, privacy และข้อจำกัดของมือถือจริง
+        </p>
+        <div class="meta-grid">
+          <div class="meta"><b>วันที่รีเสิร์ช</b><span>28 มิถุนายน 2026</span></div>
+          <div class="meta"><b>โปรเจ็ค</b><span>Next.js 16.2.9 · React 19.2.4 · หน้า app/trip-01</span></div>
+          <div class="meta"><b>เป้าหมาย</b><span>ให้คนรู้จักรู้ว่าตอนนี้ถึงไหนแล้ว ระหว่างเดินทางจริง</span></div>
+          <div class="meta"><b>คำตอบสั้น</b><span>ทำ MVP บนเว็บได้ แต่ Messenger/Google Maps ระดับ lock screen ต้อง native app</span></div>
+        </div>
+      </div>
+
+      <div class="hero-answer">
+        <div class="answer-big">
+          <h2>ทำเองได้ — ถ้า scope คือ “เปิดหน้าไว้ระหว่างขี่”</h2>
+          <p>
+            หน้า /trip-01 สามารถเป็น tracker ได้โดยใช้ <code>navigator.geolocation.getCurrentPosition()</code> ตามรอบ 5–10 นาที
+            หรือใช้ <code>watchPosition()</code> แล้ว gate การ upload; ฝั่ง viewer ใช้ realtime subscribe หรือ polling เบา ๆ เพื่อขยับ marker บนแผนที่
+          </p>
+        </div>
+        <div class="answer-small">
+          <span class="pill">ข้อจำกัดใหญ่สุด</span>
+          <p style="margin-top:10px">
+            <strong>เว็บเบราว์เซอร์ไม่เหมาะกับ background GPS ทั้งวัน</strong> — ตามสเปค Geolocation อัปเดตถูกส่งให้เอกสารที่ active และ visible;
+            ถ้าล็อกจอ/สลับแอป/แท็บถูก suspend ความถี่จะตกหรือหยุดได้
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="สารบัญ">
+      <h2>สารบัญ</h2>
+      <ol>
+        <li><a href="#how-it-works">ระบบแบบ Messenger/Google Maps ทำงานยังไง</a></li>
+        <li><a href="#web-mvp">ทำบนเว็บ /trip-01 ได้แค่ไหน</a></li>
+        <li><a href="#architecture">สถาปัตยกรรมแนะนำ</a></li>
+        <li><a href="#intervals">Realtime vs ทุก 5–10 นาที</a></li>
+        <li><a href="#security">Privacy / Security</a></li>
+        <li><a href="#implementation-plan">แผน implementation</a></li>
+        <li><a href="#sources">แหล่งอ้างอิง</a></li>
+      </ol>
+    </nav>
+
+    <section id="how-it-works">
+      <div class="section-head">
+        <p class="eyebrow">01 · Mental model</p>
+        <h2>ระบบ Live Location ทำงานเป็น pipeline 5 ชั้น</h2>
+        <p class="lead">
+          แอปอย่าง Messenger หรือ Google Maps ไม่ได้ “เปิด GPS แล้วโยนจุดขึ้นจอ” ตรง ๆ แต่เป็น pipeline ที่คุม permission,
+          battery, network, server broadcast, viewer auth และสถานะ stale/expired ตลอดเวลา
+        </p>
+      </div>
+
+      <div class="diagram">
+        <div class="flow-grid">
+          <div class="flow-step">
+            <b>1. Location provider</b>
+            <p>มือถือคำนวณตำแหน่งจาก GPS, Wi‑Fi, cell tower, sensor fusion และคืนค่า lat/lng/accuracy/speed/heading</p>
+          </div>
+          <div class="flow-step">
+            <b>2. Tracker client</b>
+            <p>แอปหรือเว็บขอ permission, watch ตำแหน่ง, filter ตามระยะ/เวลา, queue ถ้าเน็ตหลุด</p>
+          </div>
+          <div class="flow-step">
+            <b>3. Ingest API</b>
+            <p>รับ packet ผ่าน HTTPS/WebSocket, ตรวจ token/session, validate accuracy และบันทึก latest + history</p>
+          </div>
+          <div class="flow-step">
+            <b>4. Realtime fanout</b>
+            <p>broadcast update ไปยังผู้ดูผ่าน WebSocket, Supabase Realtime, Firebase listener หรือ SSE/polling fallback</p>
+          </div>
+          <div class="flow-step">
+            <b>5. Viewer map</b>
+            <p>อัปเดต marker/polyline, แสดงความแม่นยำ, เวลาอัปเดตล่าสุด, ETA และเตือนเมื่อข้อมูลเริ่ม stale</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-grid" style="margin-top:14px">
+        <article class="card">
+          <span class="score good">A</span>
+          <h3>ข้อมูลที่ส่งแต่ละครั้ง</h3>
+          <p>ควรส่งเท่าที่จำเป็น: <code>lat</code>, <code>lng</code>, <code>accuracy_m</code>, <code>speed_mps</code>, <code>heading_deg</code>, <code>client_ts</code>, <code>seq</code>, <code>session_id</code></p>
+        </article>
+        <article class="card">
+          <span class="score warn">B</span>
+          <h3>ไม่ควรส่งทุก event ดิบ</h3>
+          <p>GPS jitter ได้ โดยเฉพาะในเมือง/ใต้หลังคา จึงควรกรองด้วย accuracy, minimum distance, minimum interval และ max stale interval</p>
+        </article>
+        <article class="card">
+          <span class="score violet">C</span>
+          <h3>ผู้ดูไม่ได้ต้องการทุกจุด</h3>
+          <p>คนรู้จักต้องรู้ว่า “ตอนนี้อยู่แถวไหน/ข้อมูลล่าสุดเมื่อไร/ยังเดินทางอยู่ไหม” มากกว่าเส้นทางละเอียดระดับ turn-by-turn</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="web-mvp">
+      <div class="section-head">
+        <p class="eyebrow">02 · Feasibility</p>
+        <h2>ทำบนเว็บได้ แต่ต้องยอมรับ boundary ของ browser</h2>
+        <p class="lead">
+          Web Geolocation API รองรับ <code>getCurrentPosition()</code> และ <code>watchPosition()</code> บน HTTPS และต้องให้ผู้ใช้กดอนุญาตก่อน
+          เหมาะกับ MVP ที่เปิดหน้า tracker ไว้ระหว่างเดินทาง แต่ไม่เทียบเท่า native app ที่ทำงานตอนล็อกจอได้
+        </p>
+      </div>
+
+      <div class="two-grid">
+        <article class="callout ok">
+          <strong>เหมาะกับ /trip-01 ตอนนี้</strong>
+          <ul>
+            <li>เปิดหน้า /trip-01 บนมือถือของคุณหลังปลดรหัส</li>
+            <li>กด “Start sharing” เพื่อเริ่มส่งตำแหน่ง</li>
+            <li>ขอ screen wake lock เพื่อกันจอดับเท่าที่ browser รองรับ</li>
+            <li>คนดูเปิดลิงก์ viewer แบบ token จำกัดเวลา</li>
+          </ul>
+        </article>
+        <article class="callout danger">
+          <strong>ไม่เหมาะ ถ้าต้องการระดับ Messenger/Google Maps เต็มรูปแบบ</strong>
+          <ul>
+            <li>ล็อกจอแล้วยังส่ง GPS ถี่ตลอดทาง</li>
+            <li>สลับไปใช้แอปอื่นนาน ๆ แล้ว tracker ยังทำงานแน่นอน</li>
+            <li>ต้องการ reliability สูงในเส้นทาง 1,000 กม. โดยไม่ต้องคอยดูจอ</li>
+            <li>ต้องการ OS background permission และ battery optimization แบบ native</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>หัวข้อ</th>
+              <th>Web /trip-01 MVP</th>
+              <th>Native app / Capacitor / React Native</th>
+              <th>คำแนะนำสำหรับทริปนี้</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ขอ permission</td>
+              <td>Browser prompt ต่อ origin; ต้องเป็น HTTPS</td>
+              <td>OS permission หลายระดับ เช่น while-in-use / always</td>
+              <td>เริ่มจากเว็บพอ เพราะเป็น use case ส่วนตัว</td>
+            </tr>
+            <tr>
+              <td>อัปเดตตอนเปิดจอ</td>
+              <td>ทำได้ดีถ้าหน้า visible และเน็ตนิ่ง</td>
+              <td>ทำได้ดี</td>
+              <td>ใช้ wake lock + UI เตือน “อย่าล็อกจอถ้าต้องการ live”</td>
+            </tr>
+            <tr>
+              <td>อัปเดตตอนล็อกจอ</td>
+              <td>ไม่น่าเชื่อถือ และสเปคระบุว่าอัปเดตส่งให้เอกสาร visible/active</td>
+              <td>ทำได้ด้วย background location แต่ต้องจัดการ policy/permission</td>
+              <td>ถ้าจะใช้จริงจังทั้งวัน ให้พิจารณา native ในเฟส 2</td>
+            </tr>
+            <tr>
+              <td>ความเร็วทำ MVP</td>
+              <td>เร็วสุด: 1–3 วันสำหรับ prototype ถ้ามี Supabase/Firebase อยู่แล้ว</td>
+              <td>ช้ากว่า: ต้องทำ app, permission, build, test device</td>
+              <td>เริ่มเว็บก่อนเพื่อ validate UX</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="architecture">
+      <div class="section-head">
+        <p class="eyebrow">03 · Recommended architecture</p>
+        <h2>สถาปัตยกรรมที่เหมาะกับโปรเจ็คนี้</h2>
+        <p class="lead">
+          โปรเจ็คนี้เป็น Next.js App Router และหน้า <code>app/trip-01/trip-client.tsx</code> เป็น Client Component อยู่แล้ว
+          จึงเหมาะจะเพิ่ม tracker UI เฉพาะ client และแยก backend ingest/viewer ออกเป็น API + realtime service
+        </p>
+      </div>
+
+      <div class="repo-note">
+        <div class="repo-line"><strong>Repo fact:</strong> <code>package.json</code> ใช้ Next.js 16.2.9, React 19.2.4, ยังไม่มี dependency ด้าน map/realtime เพิ่มเติม</div>
+        <div class="repo-line"><strong>Repo fact:</strong> <code>app/trip-01/page.tsx</code> เป็น Server Component ที่ render <code>Trip01Client</code>; browser APIs ต้องอยู่ใน Client Component ตาม Next docs ที่อ่านจาก <code>node_modules/next/dist/docs/...</code></div>
+        <div class="repo-line"><strong>Repo fact:</strong> <code>Trip01Client</code> มี password gate ฝั่ง client hardcoded ไว้ฝั่ง client; ใช้กันคนทั่วไปดูแผนได้ระดับหนึ่ง แต่ไม่ควรใช้เป็น security boundary สำหรับ live location</div>
+      </div>
+
+      <div class="decision-grid" style="margin-top:16px">
+        <article class="score-card">
+          <span class="score good">1</span>
+          <h3>MVP แนะนำ: Supabase Realtime + Postgres</h3>
+          <p>
+            เหมาะกับโปรเจ็คนี้เพราะคุณคุ้นกับ Supabase/Firebase ใน stack เดิม และได้ทั้ง DB, RLS, realtime subscription, retention job ภายหลัง
+          </p>
+          <ul>
+            <li>Tracker POST ตำแหน่งผ่าน Next Route Handler หรือ Supabase function</li>
+            <li>Viewer subscribe ตาราง <code>trip_location_latest</code> ด้วย Postgres Changes หรือ Broadcast</li>
+            <li>ถ้าอัปเดตทุก 5–10 นาที ใช้ polling ทุก 30–60 วินาทีได้; realtime เป็น nice-to-have ไม่ใช่ requirement</li>
+          </ul>
+        </article>
+        <article class="score-card">
+          <span class="score warn">2</span>
+          <h3>ทางเลือกง่ายสุด: Firebase Realtime Database / Firestore</h3>
+          <p>
+            ดีมากสำหรับ listener realtime และ MVP ที่อยากลด backend code; ต้องระวัง security rules และค่าอ่าน/เขียนถ้าเปิด listener กว้างเกินไป
+          </p>
+          <ul>
+            <li>เขียน latest location ที่ path/session document</li>
+            <li>Viewer ใช้ <code>onValue()</code> หรือ <code>onSnapshot()</code></li>
+            <li>ทำ TTL/cleanup และ auth rules ให้ชัด</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>หน้าที่</th>
+              <th>ตำแหน่งใน Next.js</th>
+              <th>หมายเหตุ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Tracker panel</td>
+              <td>Start/Stop sharing, permission status, last upload, wake lock status</td>
+              <td><code>app/trip-01/trip-client.tsx</code> หรือแยก <code>live-tracker.tsx</code></td>
+              <td>ต้องเป็น <code>"use client"</code> เพราะใช้ <code>navigator.geolocation</code>, <code>window</code>, state/effect</td>
+            </tr>
+            <tr>
+              <td>Ingest API</td>
+              <td>รับตำแหน่งจาก owner, validate token, rate limit, upsert latest, insert history</td>
+              <td><code>app/api/trips/trip-01/location/route.ts</code></td>
+              <td>อย่า expose service role key ใน browser; ใช้ server-side secret เท่านั้น</td>
+            </tr>
+            <tr>
+              <td>Viewer route</td>
+              <td>แผนที่สำหรับคนรู้จัก เปิดจาก signed link</td>
+              <td><code>app/trip-01/live/page.tsx</code> + client map</td>
+              <td>ไม่ควรใช้ password gate เดิม; ใช้ viewer token ที่ revoke/expire ได้</td>
+            </tr>
+            <tr>
+              <td>Realtime</td>
+              <td>ส่ง latest location ไป viewer</td>
+              <td>Supabase channel / Firebase listener / WebSocket / SSE</td>
+              <td>ถ้า deploy บน serverless ทั่วไป WebSocket custom อาจยุ่งกว่า managed realtime</td>
+            </tr>
+            <tr>
+              <td>Map layer</td>
+              <td>แสดง marker, accuracy circle, polyline, PTT stops</td>
+              <td>Leaflet/MapLibre/Google Maps client component</td>
+              <td>Leaflet เริ่มง่าย; Google Maps ต้อง API key/billing และ mapId ถ้าใช้ Advanced Markers</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="intervals">
+      <div class="section-head">
+        <p class="eyebrow">04 · Cadence</p>
+        <h2>“Realtime” กับ “ทุก 5–10 นาที” เป็นคนละ UX</h2>
+        <p class="lead">
+          แก้จากความเข้าใจเดิม: requirement ที่ถูกคืออัปเดตทุก 5–10 <strong>นาที</strong> ไม่ใช่เมตร
+          ดังนั้น Web MVP น่าใช้ขึ้นมาก เพราะจำนวน point ทั้งทริปต่ำ แบต/เน็ตเบากว่า และไม่จำเป็นต้องใช้ realtime infrastructure ตลอดเวลา
+        </p>
+      </div>
+
+      <div class="quick-grid">
+        <article class="card">
+          <span class="score good">5</span>
+          <h3>5 นาที = จุดค่อนข้างสด</h3>
+          <p>ที่ 90 กม./ชม. รถไปได้ประมาณ 7.5 กม. ต่อ 5 นาที เหมาะให้คนรู้จักรู้ว่า “อยู่แถวไหนแล้ว” โดยไม่ต้องเห็นทุกโค้ง</p>
+        </article>
+        <article class="card">
+          <span class="score warn">10</span>
+          <h3>10 นาที = ประหยัดขึ้น</h3>
+          <p>ที่ 90 กม./ชม. ระยะห่างระหว่างจุดประมาณ 15 กม. เหมาะช่วงถนนยาว/แบตต่ำ/เน็ตไม่ดี แต่ควรแสดง timestamp ชัดเจน</p>
+        </article>
+        <article class="card">
+          <span class="score violet">UX</span>
+          <h3>Viewer ต้องเห็นความสด</h3>
+          <p>ถ้าตำแหน่งล่าสุดเกิน 15 นาที ให้ขึ้น “ข้อมูลเริ่มเก่า”; เกิน 30 นาทีให้ขึ้น “offline / ไม่ได้อัปเดต” เพื่อไม่ให้เข้าใจผิดว่าเป็น realtime</p>
+        </article>
+      </div>
+
+      <div class="callout blue" style="margin-top:16px">
+        <strong>ผลจาก research เพิ่ม:</strong>
+        Android docs แนะนำให้ใช้ interval ใหญ่ที่สุดเท่าที่ use case รับได้ เพราะความถี่สูงใช้แบตมากขึ้น;
+        สำหรับ foreground ที่ไม่ใช่ realtime แนะนำระดับ “ไม่กี่นาที” และเอกสาร geofencing ยังยกตัวอย่าง responsiveness 5–10 นาทีได้
+        ดังนั้น cadence 5–10 นาทีเข้ากับ use case “แชร์ตำแหน่งคร่าว ๆ ให้คนรู้จักดูระหว่างทริป” มากกว่า cadence รายวินาที
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>โหมด</th>
+              <th>เงื่อนไขส่งตำแหน่ง</th>
+              <th>เหมาะกับ</th>
+              <th>ข้อดี/ข้อเสีย</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Trip periodic · แนะนำ</td>
+              <td>ทุก 5 นาที ขณะกำลังเดินทาง + ส่งทันทีเมื่อกด Start/Stop/Manual ping</td>
+              <td>ทริปสงขลา → กรุงเทพฯ ที่อยากให้คนดูรู้ตำแหน่งล่าสุด</td>
+              <td>สมดุลดี: ทริป 15 ชม. มีราว 180 จุด ไม่หนัก DB/แบต/เน็ต</td>
+            </tr>
+            <tr>
+              <td>Battery saver</td>
+              <td>ทุก 10 นาที หรือเมื่อแบตต่ำ/มือถือร้อน/เน็ตไม่ดี</td>
+              <td>ช่วงถนนยาว วิ่งคงที่ หรือเมื่อ power bank ไม่พร้อม</td>
+              <td>ประหยัดขึ้น แต่ marker กระโดด 10–15 กม. ได้</td>
+            </tr>
+            <tr>
+              <td>Approach / city</td>
+              <td>ทุก 2–3 นาที เฉพาะช่วงเข้าเมือง/ใกล้ waypoint สำคัญ</td>
+              <td>ใกล้กรุงเทพฯ, พระราม 2, จุดนัดพบ, เลี้ยวเยอะ</td>
+              <td>สดขึ้นช่วงจำเป็น แต่ไม่ควรเปิดทั้งวันถ้าไม่จำเป็น</td>
+            </tr>
+            <tr>
+              <td>Rest / stopped</td>
+              <td>ส่งเมื่อถึงจุดพัก + ทุก 10–15 นาทีระหว่างพัก + ส่งทันทีเมื่อออกจากพัก</td>
+              <td>จอดปั๊ม/กินข้าว/พักนาน</td>
+              <td>ผู้ดูรู้ว่ายังปลอดภัยและจอดอยู่ โดยไม่เปลืองแบต</td>
+            </tr>
+            <tr>
+              <td>Realtime turn-by-turn</td>
+              <td>ทุกไม่กี่วินาทีหรือเมื่อขยับหลายสิบเมตร</td>
+              <td>navigation สดจริง, dispatch, delivery</td>
+              <td>ไม่ใช่ requirement ตอนนี้; ต้องระวังแบตและ background reliability</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <article class="card" style="margin-top:16px">
+        <h3>ตัวอย่าง algorithm ฝั่ง tracker สำหรับทุก 5–10 นาที</h3>
+        <p>
+          ใช้ periodic snapshot ด้วย <code>getCurrentPosition()</code> จะตรงกับ requirement กว่า realtime watch ตลอดเวลา;
+          ถ้าต้องการ marker สดขึ้นระหว่างเปิดจอ ค่อยใช้ <code>watchPosition()</code> เป็น optional mode แล้วจำกัดการ upload
+        </p>
+        <pre><code>const ACTIVE_INTERVAL_MS = 5 * 60_000;   // เดินทางปกติ: ทุก 5 นาที
+const SAVER_INTERVAL_MS = 10 * 60_000;   // ประหยัดแบต: ทุก 10 นาที
+const REST_INTERVAL_MS = 15 * 60_000;    // พักนาน: ทุก 15 นาที
+const STALE_AFTER_MS = 15 * 60_000;      // viewer เริ่มเตือนว่าข้อมูลเก่า
+const OFFLINE_AFTER_MS = 30 * 60_000;    // viewer แสดง offline / ไม่อัปเดต
+const MAX_BAD_ACCURACY_M = 250;
+
+let seq = 0;
+let timer = null;
+let mode = "active"; // "active" | "saver" | "rest"
+
+function intervalForMode() {
+  if (mode === "saver") return SAVER_INTERVAL_MS;
+  if (mode === "rest") return REST_INTERVAL_MS;
+  return ACTIVE_INTERVAL_MS;
+}
+
+function scheduleNext() {
+  clearTimeout(timer);
+  timer = setTimeout(captureAndUpload, intervalForMode());
+}
+
+function captureAndUpload(reason = "scheduled") {
+  navigator.geolocation.getCurrentPosition(async (pos) =&gt; {
+    const point = {
+      seq: ++seq,
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracyM: pos.coords.accuracy,
+      speedMps: pos.coords.speed,
+      headingDeg: pos.coords.heading,
+      clientTs: new Date(pos.timestamp).toISOString(),
+      reason,
+      mode,
+    };
+
+    if (point.accuracyM &lt;= MAX_BAD_ACCURACY_M || reason === "manual") {
+      await uploadLocation(point);
+    }
+
+    scheduleNext();
+  }, (error) =&gt; {
+    reportTrackerError(error);
+    scheduleNext();
+  }, {
+    enableHighAccuracy: mode !== "saver",
+    timeout: 20_000,
+    maximumAge: 60_000,
+  });
+}
+
+// Start: ส่งทันที แล้วค่อยวนทุก 5–10 นาที
+captureAndUpload("start");
+
+// Manual ping: ปุ่มให้ rider กดส่งจุดล่าสุดทันทีเมื่อถึงปั๊ม/เกิดเหตุ
+function manualPing() {
+  captureAndUpload("manual");
+}</code></pre>
+      </article>
+    </section>
+
+    <section id="security">
+      <div class="section-head">
+        <p class="eyebrow">05 · Privacy & security</p>
+        <h2>Live location เป็นข้อมูลอ่อนไหว ต้องออกแบบให้ปิดง่ายและหมดอายุเอง</h2>
+        <p class="lead">
+          หน้านี้ตั้งใจให้ “คนรู้จัก” ดูเท่านั้น ดังนั้นห้ามใช้ public endpoint แบบไม่มี token และห้ามเก็บ route history ถาวรโดยไม่จำเป็น
+        </p>
+      </div>
+
+      <div class="risk-grid">
+        <article class="callout danger">
+          <strong>ห้ามใช้ password ฝั่ง client เป็น security จริง</strong>
+          <p>รหัสใน <code>trip-client.tsx</code> ถูก bundle ไป browser ได้ คนที่ inspect code อาจเห็นได้ จึงเหมาะแค่กันคน casual ไม่ใช่กัน live location</p>
+        </article>
+        <article class="callout blue">
+          <strong>ใช้ signed viewer link</strong>
+          <p>สร้าง URL เช่น <code>/trip-01/live?t=...</code> ที่ผูก session, expire, revoke ได้ และเก็บ hash ของ token ใน DB ไม่เก็บ token plain</p>
+        </article>
+        <article class="callout ok">
+          <strong>มีปุ่ม Stop ชัดเจน</strong>
+          <p>Owner ต้องหยุดแชร์ได้ทันที และระบบควรตั้ง TTL เช่น ปิด session อัตโนมัติหลัง 24 ชั่วโมงหรือเมื่อถึงปลายทาง</p>
+        </article>
+      </div>
+
+      <div class="table-wrap" style="margin-top:16px">
+        <table>
+          <thead>
+            <tr>
+              <th>มาตรการ</th>
+              <th>รายละเอียด</th>
+              <th>เหตุผล</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>HTTPS เท่านั้น</td>
+              <td>Geolocation และ wake lock ต้อง secure context; production deploy เช่น Vercel ใช้ HTTPS</td>
+              <td>ป้องกันข้อมูลตำแหน่งหลุดระหว่างทาง และตรงตาม browser requirement</td>
+            </tr>
+            <tr>
+              <td>Token แยก owner/viewer</td>
+              <td>Owner token ส่ง location ได้; viewer token อ่านได้อย่างเดียว</td>
+              <td>ลด damage ถ้าลิงก์ viewer ถูก forward</td>
+            </tr>
+            <tr>
+              <td>RLS / API validation</td>
+              <td>Supabase เปิด Row Level Security หรือผ่าน API server ที่ตรวจ session ทุกครั้ง</td>
+              <td>กัน client เขียน/อ่านข้าม session</td>
+            </tr>
+            <tr>
+              <td>Retention</td>
+              <td>ลบ history point หลัง 24–72 ชม.; เก็บ latest เมื่อ session active เท่านั้น</td>
+              <td>ลดความเสี่ยงจากข้อมูลย้อนหลัง</td>
+            </tr>
+            <tr>
+              <td>Coarse mode optional</td>
+              <td>ถ้าใกล้บ้าน/ที่พัก อาจ blur ตำแหน่งเป็น radius 200–500 เมตร หรือหยุดแชร์</td>
+              <td>ลดการเปิดเผยจุดพัก/บ้านแบบละเอียด</td>
+            </tr>
+            <tr>
+              <td>Stale state</td>
+              <td>ถ้า update ล่าสุดเกิน 2–5 นาที แสดงสีเหลือง/แดงและข้อความ “ข้อมูลเก่า”</td>
+              <td>ผู้ดูจะไม่เข้าใจผิดว่าตำแหน่งล่าสุดคือ realtime</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="implementation-plan">
+      <div class="section-head">
+        <p class="eyebrow">06 · Implementation plan</p>
+        <h2>แผนทำจริงแบบเป็นเฟส</h2>
+        <p class="lead">
+          ถ้าจะลงมือ implement ต่อ แนะนำแบ่งเป็น 3 เฟสเพื่อให้ได้ของใช้ได้เร็วและไม่ over-engineer ตั้งแต่แรก
+        </p>
+      </div>
+
+      <div class="timeline">
+        <article class="timeline-item">
+          <div class="card">
+            <h3>Phase 1 — Local prototype บน /trip-01</h3>
+            <ul>
+              <li>เพิ่ม panel “Live Location” ในหน้า trip หลังปลดรหัส</li>
+              <li>ใช้ <code>navigator.geolocation.getCurrentPosition()</code> ตามรอบ 5–10 นาที หรือ <code>watchPosition()</code> เฉพาะตอนทดสอบความถี่สูง แสดงตำแหน่ง/accuracy ล่าสุดในหน้าเดียว</li>
+              <li>เพิ่ม Haversine filter, permission status, error state และปุ่ม Start/Stop</li>
+              <li>ยังไม่ส่งออก internet; ใช้ทดสอบบนมือถือจริงก่อน</li>
+            </ul>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <div class="card">
+            <h3>Phase 2 — Backend + viewer link</h3>
+            <ul>
+              <li>เลือก Supabase หรือ Firebase</li>
+              <li>สร้าง session + viewer token + latest table/document</li>
+              <li>Route Handler สำหรับ ingest: validate token, rate limit, upsert latest, append history</li>
+              <li>หน้า <code>/trip-01/live</code> แสดงแผนที่ + marker + stale state + ETA ไป waypoint ถัดไป</li>
+            </ul>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <div class="card">
+            <h3>Phase 3 — Reliability สำหรับเดินทางจริง</h3>
+            <ul>
+              <li>offline queue เมื่อเน็ตหลุด และ flush เมื่อกลับมาออนไลน์</li>
+              <li>wake lock opt-in + เตือนเมื่อ tab hidden / จอดับ / permission denied</li>
+              <li>retention cleanup, revoke link, audit log ว่าใครเข้าดู</li>
+              <li>fallback polling เมื่อ realtime subscribe หลุด</li>
+            </ul>
+          </div>
+        </article>
+        <article class="timeline-item">
+          <div class="card">
+            <h3>Phase 4 — Native ถ้าต้องการระดับ Messenger</h3>
+            <ul>
+              <li>ทำ React Native/Capacitor app หรือ companion app เฉพาะ tracker</li>
+              <li>ใช้ OS background location + foreground notification/indicator ตาม policy</li>
+              <li>ยังใช้ viewer web ของเดิมได้</li>
+            </ul>
+          </div>
+        </article>
+      </div>
+
+      <div class="db-grid" style="margin-top:16px">
+        <article class="card">
+          <h3><code>trip_share_sessions</code></h3>
+          <p>เก็บ session, trip_id, active, expires_at, owner_token_hash, viewer_token_hash, revoked_at</p>
+        </article>
+        <article class="card">
+          <h3><code>trip_location_latest</code></h3>
+          <p>เก็บจุดล่าสุด 1 row ต่อ session เพื่ออ่านเร็วและ subscribe ง่าย</p>
+        </article>
+        <article class="card">
+          <h3><code>trip_location_points</code></h3>
+          <p>เก็บ history แบบ append-only สำหรับวาดเส้นทาง ย้อนหลัง และ debug แต่ลบตาม TTL</p>
+        </article>
+        <article class="card">
+          <h3><code>trip_view_events</code></h3>
+          <p>optional: เก็บ viewer access แบบไม่ละเอียดเกินไป เพื่อรู้ว่ามีใครเปิดดู</p>
+        </article>
+      </div>
+
+      <article class="card" style="margin-top:16px">
+        <h3>ตัวอย่าง payload ที่ควรส่งไป server</h3>
+        <pre><code>{
+  "sessionId": "trip01_2026_...",
+  "seq": 184,
+  "lat": 13.5361776,
+  "lng": 100.2209807,
+  "accuracyM": 18,
+  "speedMps": 21.4,
+  "headingDeg": 12,
+  "clientTs": "2026-06-28T10:29:42.120Z",
+  "source": "web-geolocation",
+  "battery": { "level": 0.62, "charging": false }
+}</code></pre>
+      </article>
+    </section>
+
+    <section id="sources">
+      <div class="section-head">
+        <p class="eyebrow">07 · Sources</p>
+        <h2>แหล่งอ้างอิงที่ใช้</h2>
+        <p class="lead">ใช้ official/upstream docs เป็นหลัก และตรวจ repo-local context จากไฟล์ในโปรเจ็คนี้</p>
+      </div>
+
+      <div class="source-list">
+        <article class="source-card">
+          <h3>MDN — Geolocation API</h3>
+          <p>ยืนยันว่า Geolocation API ต้องใช้ HTTPS, ต้องขอ permission และมี <code>getCurrentPosition()</code>/<code>watchPosition()</code> สำหรับตำแหน่งปัจจุบันและการติดตามการเปลี่ยนตำแหน่ง</p>
+          <small><a href="https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API">https://developer.mozilla.org/en-US/docs/Web/API/Geolocation_API</a></small>
+        </article>
+        <article class="source-card">
+          <h3>MDN — getCurrentPosition() / watchPosition()</h3>
+          <p>หลังแก้ requirement เป็นทุก 5–10 นาที ใช้ <code>getCurrentPosition()</code> แบบ periodic snapshot เป็น default ได้; <code>watchPosition()</code> ยังใช้ได้สำหรับ optional live mode และทั้งคู่รองรับ options เช่น <code>enableHighAccuracy</code>, <code>timeout</code>, <code>maximumAge</code></p>
+          <small><a href="https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/getCurrentPosition">getCurrentPosition()</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/Geolocation/watchPosition">watchPosition()</a></small>
+        </article>
+        <article class="source-card">
+          <h3>W3C Geolocation Candidate Recommendation</h3>
+          <p>ระบุรายละเอียด <code>PositionOptions</code>, accuracy/heading/speed, privacy guidance และข้อจำกัดว่า position updates ถูกส่งให้เอกสารที่ fully active และ visible</p>
+          <small><a href="https://www.w3.org/TR/geolocation/">https://www.w3.org/TR/geolocation/</a></small>
+        </article>
+        <article class="source-card">
+          <h3>MDN — WebSocket / Server-Sent Events</h3>
+          <p>ใช้เปรียบเทียบ transport สำหรับ realtime fanout: WebSocket เป็นสองทาง ส่วน SSE เป็น server-to-client ทางเดียว เหมาะเป็น fallback หรือ viewer-only stream</p>
+          <small><a href="https://developer.mozilla.org/en-US/docs/Web/API/WebSocket">https://developer.mozilla.org/en-US/docs/Web/API/WebSocket</a> · <a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events">SSE guide</a></small>
+        </article>
+        <article class="source-card">
+          <h3>Supabase Realtime Docs</h3>
+          <p>ยืนยันการใช้ Broadcast ผ่าน WebSocket และการ subscribe Postgres Changes พร้อม RLS/replication setup; เหมาะกับ MVP ที่ต้องการ DB + realtime</p>
+          <small><a href="https://supabase.com/docs/guides/realtime/broadcast">https://supabase.com/docs/guides/realtime/broadcast</a> · <a href="https://supabase.com/docs/guides/realtime/postgres-changes">Postgres Changes</a></small>
+        </article>
+        <article class="source-card">
+          <h3>Firebase Realtime Database / Firestore Docs</h3>
+          <p>ใช้เป็นทางเลือก managed realtime: Realtime Database มี listener ที่ trigger เมื่อข้อมูลเปลี่ยน; Firestore มี <code>onSnapshot()</code> สำหรับ realtime document updates</p>
+          <small><a href="https://firebase.google.com/docs/database/web/read-and-write">https://firebase.google.com/docs/database/web/read-and-write</a> · <a href="https://firebase.google.com/docs/firestore/query-data/listen">Firestore listen</a></small>
+        </article>
+        <article class="source-card">
+          <h3>Google Maps JavaScript API / Leaflet</h3>
+          <p>ใช้เทียบ map renderer: Google Maps Advanced Markers ต้องโหลด marker library และใช้ API key; Leaflet เป็น open-source mobile-friendly interactive map และใช้ marker/polyline ได้ง่าย</p>
+          <small><a href="https://developers.google.com/maps/documentation/javascript/advanced-markers/add-marker">Google Maps Advanced Markers</a> · <a href="https://leafletjs.com/examples/quick-start/">Leaflet Quick Start</a></small>
+        </article>
+        <article class="source-card">
+          <h3>Android Developers — Background location</h3>
+          <p>ใช้ยืนยันว่าการทำ background location แบบ native ต้องขอ permission เฉพาะ, ต้องเป็น core functionality และ Android จำกัด background updates เพื่อประหยัดแบต</p>
+          <small><a href="https://developer.android.com/develop/sensors-and-location/location/background">https://developer.android.com/develop/sensors-and-location/location/background</a></small>
+        </article>
+        <article class="source-card">
+          <h3>Android Developers — Battery & real-world location scenarios</h3>
+          <p>ใช้รีเสิร์ชเพิ่มหลังแก้ requirement เป็นทุก 5–10 นาที: เอกสารแนะนำให้ลด frequency เพื่อประหยัดแบต, ใช้ interval ใหญ่ที่สุดที่รับได้ และยกตัวอย่าง foreground ที่ไม่ใช่ realtime เป็นระดับไม่กี่นาที รวมถึง geofencing responsiveness 5–10 นาที</p>
+          <small><a href="https://developer.android.com/develop/sensors-and-location/location/battery">Battery guide</a> · <a href="https://developer.android.com/develop/sensors-and-location/location/battery/scenarios">Real-world scenarios</a></small>
+        </article>
+        <article class="source-card">
+          <h3>MDN — Screen Wake Lock API</h3>
+          <p>ใช้เป็นตัวช่วยเว็บ MVP เพื่อกันจอดับเมื่อผู้ใช้ยินยอม แต่ยังผูกกับ active/visible document และอาจถูกระบบปล่อย lock ได้</p>
+          <small><a href="https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API">https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API</a></small>
+        </article>
+        <article class="source-card">
+          <h3>Repo-local evidence</h3>
+          <p>ตรวจจาก <code>package.json</code>, <code>app/trip-01/page.tsx</code>, <code>app/trip-01/trip-client.tsx</code>, <code>app/trip-01/trip.module.css</code> และ Next docs ใน <code>node_modules/next/dist/docs/01-app/...</code></p>
+          <small>Local files in this repository; no external URL</small>
+        </article>
+      </div>
+    </section>
+
+    <footer>
+      <p><strong>Recommendation:</strong> เริ่มทำ Web MVP บน <code>/trip-01</code> ด้วย Supabase/Firebase realtime ก่อน ถ้าทดสอบแล้วต้องการความน่าเชื่อถือตอนล็อกจอทั้งวัน ค่อยแยกเป็น native tracker app ในเฟสถัดไป</p>
+    </footer>
+  </main>
+</body>
+</html>

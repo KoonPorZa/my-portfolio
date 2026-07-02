@@ -1,0 +1,32 @@
+{
+  "name": "trip-gps-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fastify + TypeScript backend for Trip GPS live-location (Phase 11).",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.2.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^11.1.0",
+    "@fastify/sensible": "^6.0.4",
+    "@sinclair/typebox": "^0.34.49",
+    "@supabase/supabase-js": "^2.108.2",
+    "fastify": "^5.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
