@@ -46,6 +46,7 @@ export function createGoogleRouteHandler(
   log: Pick<FastifyBaseLogger, "error" | "info"> = console
 ): GoogleRouteHandler {
   const cache = new Map<string, CacheEntry>();
+  const inflight = new Map<string, Promise<GoogleRouteResult>>();
   let dayCounter: DayCounter = { utcDay: "", count: 0 };
 
   return async function handleGoogleRoute(
@@ -72,6 +73,18 @@ export function createGoogleRouteHandler(
       return cached.data;
     }
 
+    // Single-flight: coalesce concurrent cache-misses onto ONE upstream call so
+    // a burst during the miss window (first request / TTL expiry / cold start)
+    // cannot fan out into N billed Google Routes calls.
+    const inflightExisting = inflight.get(cacheKey);
+    if (inflightExisting) {
+      log.info(
+        { tripId, cache: "coalesced" },
+        "[google-route] joined an in-flight upstream fetch"
+      );
+      return inflightExisting;
+    }
+
     const utcDay = utcDayString(now);
 
     if (dayCounter.utcDay !== utcDay) {
@@ -92,42 +105,56 @@ export function createGoogleRouteHandler(
       return { fallback: true, reason: "quota" };
     }
 
-    const result = await fetchGoogleRoute(env.googleMapsRoutesApiKey, log);
-
-    if (!result) {
-      return { fallback: true, reason: "upstream_error" };
-    }
-
+    // Reserve the quota slot BEFORE awaiting the upstream call, so the check and
+    // the consume are atomic within the event loop and concurrent misses cannot
+    // all pass a stale gate. Conservatively NOT refunded on upstream error (the
+    // call may already have billed).
     dayCounter.count += 1;
+    const reservedCount = dayCounter.count;
 
-    log.info(
-      {
-        tripId,
-        cache: "miss",
-        upstreamCallsToday: dayCounter.count,
-        dailyQuota: env.tripGoogleRouteDailyQuota,
-        nearQuota: dayCounter.count >= env.tripGoogleRouteDailyQuota,
-      },
-      "[google-route] fetched fresh planned route from Google Routes API"
-    );
+    const fetchPromise = (async (): Promise<GoogleRouteResult> => {
+      try {
+        const result = await fetchGoogleRoute(env.googleMapsRoutesApiKey, log);
 
-    const ttlMs = env.tripGoogleRouteCacheTtlSeconds * 1_000;
-    const cachedAt = new Date(now).toISOString();
-    const expiresAt = new Date(now + ttlMs).toISOString();
+        if (!result) {
+          return { fallback: true, reason: "upstream_error" };
+        }
 
-    const entry: GoogleRouteSuccess = {
-      fallback: false,
-      encodedPolyline: result.encodedPolyline,
-      distanceMeters: result.distanceMeters,
-      durationSeconds: result.durationSeconds,
-      source: "google",
-      cachedAt,
-      expiresAt,
-    };
+        const ttlMs = env.tripGoogleRouteCacheTtlSeconds * 1_000;
+        const cachedAt = new Date(now).toISOString();
+        const expiresAt = new Date(now + ttlMs).toISOString();
 
-    cache.set(cacheKey, { data: entry, expiresAt: now + ttlMs });
+        const entry: GoogleRouteSuccess = {
+          fallback: false,
+          encodedPolyline: result.encodedPolyline,
+          distanceMeters: result.distanceMeters,
+          durationSeconds: result.durationSeconds,
+          source: "google",
+          cachedAt,
+          expiresAt,
+        };
 
-    return entry;
+        cache.set(cacheKey, { data: entry, expiresAt: now + ttlMs });
+
+        log.info(
+          {
+            tripId,
+            cache: "miss",
+            upstreamCallsToday: reservedCount,
+            dailyQuota: env.tripGoogleRouteDailyQuota,
+            nearQuota: reservedCount >= env.tripGoogleRouteDailyQuota,
+          },
+          "[google-route] fetched fresh planned route from Google Routes API"
+        );
+
+        return entry;
+      } finally {
+        inflight.delete(cacheKey);
+      }
+    })();
+
+    inflight.set(cacheKey, fetchPromise);
+    return fetchPromise;
   };
 }
 

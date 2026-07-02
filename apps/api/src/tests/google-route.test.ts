@@ -136,6 +136,25 @@ describe("GET /api/trips/001/google-route", () => {
     expect(response.json()).toEqual({ fallback: true, reason: "quota" });
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it("edge-caches the planned route (s-maxage) but never caches a fallback", async () => {
+    vi.stubGlobal("fetch", makeFetchSuccess());
+    app = await makeApp({ GOOGLE_MAPS_ROUTES_API_KEY: "fake-key" });
+
+    const ok = await app.inject({ method: "GET", url: "/api/trips/001/google-route" });
+    expect(ok.statusCode).toBe(200);
+    expect(String(ok.headers["cdn-cache-control"])).toContain("s-maxage=");
+    expect(String(ok.headers["cache-control"])).toContain("s-maxage=");
+
+    await app.close();
+
+    // No key -> fallback -> must be no-store (transient, never cached).
+    app = await makeApp();
+    const fb = await app.inject({ method: "GET", url: "/api/trips/001/google-route" });
+    expect(fb.json()).toEqual({ fallback: true, reason: "disabled" });
+    expect(fb.headers["cdn-cache-control"]).toBe("no-store");
+    expect(fb.headers["cache-control"]).toBe("no-store");
+  });
 });
 
 describe("google-route cost-guard observability (Phase 16)", () => {
@@ -180,5 +199,52 @@ describe("google-route cost-guard observability (Phase 16)", () => {
     expect(log.info.mock.calls.map((call) => call[0])).toContainEqual(
       expect.objectContaining({ guard: "quota" })
     );
+  });
+
+  it("coalesces concurrent cache-misses into ONE upstream call (single-flight)", async () => {
+    const mockFetch = makeFetchSuccess();
+    vi.stubGlobal("fetch", mockFetch);
+    const log = { info: vi.fn(), error: vi.fn() };
+    const handler = createGoogleRouteHandler(makeEnv(), log);
+
+    const results = await Promise.all([
+      handler("001"),
+      handler("001"),
+      handler("001"),
+      handler("001"),
+      handler("001"),
+    ]);
+
+    // 5 concurrent misses, but only ONE billed upstream call.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    for (const r of results) {
+      expect(r.fallback).toBe(false);
+    }
+    // The coalesced joiners are logged, not billed.
+    expect(log.info.mock.calls.map((c) => c[0])).toContainEqual(
+      expect.objectContaining({ cache: "coalesced" })
+    );
+  });
+
+  it("reserves quota before the upstream call and does not refund on error", async () => {
+    // quota=1; first call fails upstream -> slot stays consumed (conservative).
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+    }) as unknown as typeof globalThis.fetch;
+    vi.stubGlobal("fetch", mockFetch);
+    const log = { info: vi.fn(), error: vi.fn() };
+    const handler = createGoogleRouteHandler(
+      makeEnv({ TRIP_GOOGLE_ROUTE_DAILY_QUOTA: "1" }),
+      log
+    );
+
+    const first = await handler("001");
+    expect(first).toEqual({ fallback: true, reason: "upstream_error" });
+
+    // Slot already burned -> next request is quota-blocked, no 2nd upstream call.
+    const second = await handler("001");
+    expect(second).toEqual({ fallback: true, reason: "quota" });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

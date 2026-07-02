@@ -84,6 +84,26 @@ Frontend (public, `apps/web`, build-time — inline ลง client):
 | `TRIP_GPS_SUPABASE_SERVICE_ROLE_KEY` | Yes for Supabase | Supabase `service_role` secret — ดูวิธีเอาด้านล่าง |
 | `TRIP_GPS_OWNER_CODE` | Yes | รหัส owner แบบ plaintext ที่ใช้เริ่ม/หยุดแชร์ — ดูด้านล่าง |
 
+### API hardening + proxy (Phase 14) — optional, มี default ปลอดภัย
+
+| Key | Required | เอามาจากไหน / ใช้ทำอะไร |
+| --- | --- | --- |
+| `TRUST_PROXY` | Optional | กี่ proxy hop ที่เชื่อเพื่อหา client IP จริง. Default `1` = Railway (DNS-only). ตั้ง `2` **เฉพาะ**เมื่อ `api.koonporza.com` ถูก Cloudflare **Proxied** (orange). **ห้ามตั้ง `true`** — จะเชื่อ `x-forwarded-for` ที่ client ปลอมได้ ทำให้ per-IP rate limit ถูก bypass. ตั้งผิด hop = ทุก client รวมเป็น bucket เดียว (เจอ false 429). ตรวจได้โดย log `request.ip` เทียบกับ IP client จริงบน host |
+| `BODY_LIMIT_BYTES` | Optional | ขนาด request body สูงสุด (byte). Default `16384`. เกิน → `413` ก่อนถึง handler/store |
+| `RATE_LIMIT_WINDOW` | Optional | หน้าต่างเวลาของ rate limit. Default `1 minute` |
+| `RATE_LIMIT_VIEWER_MAX` | Optional | viewer `GET location` ต่อ IP ต่อหน้าต่าง. Default `60` |
+| `RATE_LIMIT_OWNER_MAX` | Optional | owner writes (upload/stop/progress) ต่อ IP. Default `20` |
+| `RATE_LIMIT_SESSION_START_MAX` | Optional | `session/start` ต่อ IP (เข้มกว่าเพราะกันเดา owner code). Default `5` |
+| `RATE_LIMIT_GOOGLE_ROUTE_MAX` | Optional | `GET /google-route` ต่อ IP. Default `10` |
+| `OWNER_CODE_MAX_ATTEMPTS` | Optional | กรอก owner code ผิดกี่ครั้งต่อ IP ก่อนโดน lock. Default `10` |
+| `OWNER_CODE_LOCK_MINUTES` | Optional | ล็อก IP กี่นาทีหลังเกิน max attempts. Default `15` |
+
+### Observability (Phase 16) — optional
+
+| Key | Required | เอามาจากไหน / ใช้ทำอะไร |
+| --- | --- | --- |
+| `RAILWAY_GIT_COMMIT_SHA` / `GIT_SHA` | Optional | git SHA ของ build ที่รันอยู่ — Railway inject `RAILWAY_GIT_COMMIT_SHA` ให้เอง; โผล่ที่ `/health` + `/version` เพื่อผูก instance กับ commit |
+
 ---
 
 ## เอาค่ามาจากไหน (external services)

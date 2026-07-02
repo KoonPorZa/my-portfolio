@@ -65,7 +65,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.addHook("onRequest", async (request, reply) => {
-    if (request.url.startsWith("/api/trips/")) {
+    // Location/session/viewer responses must never be cached. The planned
+    // Google route (/google-route) is the exception: it is non-token, identical
+    // for everyone, and cost-sensitive — its handler sets a TTL-bounded
+    // s-maxage so a shared edge (Cloudflare) can absorb bursts instead of
+    // fanning out to the billed upstream. So skip the blanket no-store there.
+    if (request.url.startsWith("/api/trips/") && !isGoogleRoutePath(request.url)) {
       setNoStoreHeaders(reply);
     }
   });
@@ -165,4 +170,10 @@ function handleError(
 function setNoStoreHeaders(reply: FastifyReply): void {
   reply.header("Cache-Control", "no-store");
   reply.header("CDN-Cache-Control", "no-store");
+}
+
+function isGoogleRoutePath(url: string): boolean {
+  // Path is /api/trips/:tripId/google-route (no query string on this route).
+  const path = url.split("?")[0] ?? url;
+  return path.endsWith("/google-route");
 }

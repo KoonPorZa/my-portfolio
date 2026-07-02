@@ -258,8 +258,27 @@ export async function tripGpsRoutes(
         },
       },
     },
-    async (request) => {
-      return options.googleRouteHandler(request.params.tripId);
+    async (request, reply) => {
+      const result = await options.googleRouteHandler(request.params.tripId);
+
+      if (result.fallback) {
+        // Fallback is transient (disabled / quota / upstream error) — never cache it.
+        reply.header("Cache-Control", "no-store");
+        reply.header("CDN-Cache-Control", "no-store");
+      } else {
+        // Cache the fixed planned route at a shared edge for the REMAINING TTL
+        // only (never longer than the server cache; still TTL-bounded per Google
+        // ToS — never a permanent artifact). Browsers don't cache it (max-age=0);
+        // a shared edge (Cloudflare) does, absorbing bursts before the upstream.
+        const remainingSeconds = Math.max(
+          0,
+          Math.floor((Date.parse(result.expiresAt) - Date.now()) / 1000)
+        );
+        reply.header("Cache-Control", `public, max-age=0, s-maxage=${remainingSeconds}`);
+        reply.header("CDN-Cache-Control", `public, s-maxage=${remainingSeconds}`);
+      }
+
+      return result;
     }
   );
 

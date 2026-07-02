@@ -167,31 +167,54 @@ Full reference (Thai): `docs/env-doc.md`. Quick summary:
 
 ## Optional: Google motorcycle map (Phase 17)
 
-**Off by default; enabling is opt-in and billed.**
+**Off by default; enabling is opt-in and BILLED. `/trip/001/live` is now
+Google-only — there is NO free map fallback — so the per-API quota caps below
+are your only real spend ceiling. Read the whole section before enabling.**
 
-1. **Enable APIs & create two separate API keys** in Google Cloud console:
+> ⛔ **Blocking checklist — do NOT set `NEXT_PUBLIC_TRIP_GOOGLE_MAP_ENABLED=1`
+> until every step below is done AND verified in the live Google Cloud console.**
+> A billing **budget/alert only notifies — it does NOT stop spend.** The one and
+> only hard stop is a per-API **quota cap** on each key. The app-level
+> `TRIP_GOOGLE_ROUTE_DAILY_QUOTA` is best-effort only: it is per-process and
+> resets on every Railway restart/redeploy (and multiplies per replica), and it
+> does not cover the browser Maps JS key at all.
+
+1. **Enable APIs & create two SEPARATE, restricted keys** in Google Cloud console:
    - Enable **Routes API** and **Maps JavaScript API**.
-   - Create **two separate API keys** (one for each API).
+   - Create **two separate keys** (one per API) — never reuse one key for both.
 
-2. **Routes API key** (`GOOGLE_MAPS_ROUTES_API_KEY`):
-   - In Google Cloud console, restrict this key to **Routes API only**.
-   - Add it as a **server-only** env var on the **Railway backend**
-     (never in `NEXT_PUBLIC_*` or frontend).
-   - Also set on Railway: `TRIP_GOOGLE_ROUTE_CACHE_TTL_SECONDS` (default `86400`)
-     and `TRIP_GOOGLE_ROUTE_DAILY_QUOTA` (cost guard; default `50`).
+2. **Routes API key** (`GOOGLE_MAPS_ROUTES_API_KEY`, server-only on Railway):
+   - Restrict the key to **Routes API only** (and, if feasible, to Railway egress IPs).
+   - **Set a hard quota** on the Routes API — e.g. **100 requests/day + 5/min**
+     (APIs & Services → Routes API → Quotas). This is the real, restart-proof cap.
+   - Never put this key in `NEXT_PUBLIC_*` / the frontend.
+   - Optional app-level guard (defense-in-depth, NOT a cap):
+     `TRIP_GOOGLE_ROUTE_CACHE_TTL_SECONDS` (default `86400`),
+     `TRIP_GOOGLE_ROUTE_DAILY_QUOTA` (default `50`).
 
-3. **Maps JavaScript API key** (`NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`):
-   - In Google Cloud console, restrict this key to **Maps JavaScript API only**.
-   - Add an **HTTP-referrer allowlist**: `koonporza.com` and `www.koonporza.com`.
-   - Set a **low daily quota** (e.g. 100 requests/day) in the console.
-   - Set `NEXT_PUBLIC_TRIP_GOOGLE_MAP_ENABLED=1` + the key in the **frontend env**
-     (Vercel / `.env.production`), then redeploy to Cloudflare Workers.
+3. **Maps JavaScript API key** (`NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY`, PUBLIC in the bundle):
+   - Restrict to **Maps JavaScript API only**.
+   - **HTTP-referrer allowlist**: exactly `https://koonporza.com/*` and
+     `https://www.koonporza.com/*` (no broad wildcards). Remove any `localhost`
+     entry before production.
+   - **Set a hard daily quota** on the Maps JS map-loads metric (e.g. `200–500/day`).
+     The page loads a billed Dynamic Map on every view, so this quota is the only
+     ceiling on client-side spend.
+   - Only then set `NEXT_PUBLIC_TRIP_GOOGLE_MAP_ENABLED=1` + the key in the
+     frontend env and **rebuild + redeploy the web app** (`NEXT_PUBLIC_*` are
+     inlined at build time, so an env-only change won't take effect).
 
-4. **Cost guard**: With both flags off (default), the viewer costs 0฿ and works
-   fully on the free MapLibre + BRouter/OSM map. If keys are missing, quota is
-   exhausted, or the endpoint fails → automatic fallback to MapLibre (no loss
-   of service). Leave both flags off to stay at 0฿ unless you explicitly enable
-   the Google mode.
+4. **What happens when off / over quota:** with the flag off (default) no Google
+   script is requested and cost is 0฿. When enabled and the Routes endpoint
+   returns `fallback` (missing key / quota / upstream error) or the Google Maps
+   JS fails to load, the viewer shows a short "map unavailable" notice — **there
+   is no free MapLibre fallback anymore** (it was removed; the live map is
+   Google-only). The per-API console quotas are the hard spend stop.
+
+> **Verify pricing live.** Google restructured Maps Platform SKUs/free tiers in
+> 2025 — confirm the current per-load (Dynamic Maps) and per-call (Routes
+> `computeRoutes` TWO_WHEELER) price + free allotment in *this* billing account
+> and size the quotas so worst-case billed traffic stays within budget.
 
 Full env reference: `docs/env-doc.md`.
 
