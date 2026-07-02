@@ -30,11 +30,9 @@ type GoogleRouteResponse =
 export function GoogleRouteMap({
   live,
   actualTrack,
-  onFallback,
 }: {
   live: LivePoint;
   actualTrack: TrackPoint[];
-  onFallback: () => void;
 }) {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -42,14 +40,6 @@ export function GoogleRouteMap({
   const actualTrackRef = useRef<google.maps.Polyline | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const fellBackRef = useRef(false);
-
-  function triggerFallback() {
-    if (!fellBackRef.current) {
-      fellBackRef.current = true;
-      onFallback();
-    }
-  }
 
   // Initial load: Google script + route fetch + map init.
   useEffect(() => {
@@ -60,8 +50,7 @@ export function GoogleRouteMap({
         await loadGoogleMaps(googleMapsBrowserKey());
       } catch {
         if (!cancelled) {
-          setLoadError("โหลด Google Maps ไม่สำเร็จ");
-          triggerFallback();
+          setLoadError("โหลด Google Maps ไม่สำเร็จ — ลองรีเฟรชอีกครั้ง");
         }
         return;
       }
@@ -81,8 +70,7 @@ export function GoogleRouteMap({
         routeData = json;
       } catch {
         if (!cancelled) {
-          setLoadError("โหลดเส้นทาง Google ไม่สำเร็จ");
-          triggerFallback();
+          setLoadError("โหลดเส้นทาง Google ไม่สำเร็จ — ลองรีเฟรชอีกครั้ง");
         }
         return;
       }
@@ -90,8 +78,7 @@ export function GoogleRouteMap({
       if (cancelled) return;
 
       if (routeData.fallback) {
-        setLoadError(`เส้นทาง Google ไม่พร้อม: ${routeData.reason}`);
-        triggerFallback();
+        setLoadError(`เส้นทาง Google ไม่พร้อม (${routeData.reason})`);
         return;
       }
 
@@ -217,11 +204,7 @@ export function GoogleRouteMap({
   }, [live]);
 
   if (loadError) {
-    return (
-      <div className={styles.mapLoading}>
-        {loadError} — กำลังสลับไปแผนที่ปกติ…
-      </div>
-    );
+    return <div className={styles.mapLoading}>{loadError}</div>;
   }
 
   return <div ref={mapDivRef} className={styles.map} />;
