@@ -2,19 +2,24 @@
 
 Two deployables in this monorepo:
 
-- **`apps/web`** — Next.js 16 frontend → **Cloudflare Workers** (via the
-  [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter).
+- **`apps/web`** — Next.js 16 frontend → **Vercel** (the LIVE production host).
+  Vercel is wired via **GitHub integration** on repo `KoonPorZa/my-portfolio`
+  (Root Directory `apps/web`, framework auto-detected); it **deploys on every push
+  to `main`**. `koonporza.com` + `www` resolve to Vercel. The Cloudflare Workers +
+  OpenNext path in **§2 is an ALTERNATE** — its config (`wrangler.jsonc`,
+  `open-next.config.ts`, the `cf-build`/`deploy` scripts) is committed but is NOT
+  the live host; use it only if migrating off Vercel.
 - **`apps/api`** — Fastify GPS backend → **Railway** (Docker deploy from
   `apps/api/Dockerfile`, see §3). It reads Railway's injected `PORT` and binds
-  `0.0.0.0`, so it runs on Railway as-is. Fastify needs a long-running Node
-  server, so it does **not** run on Workers. Cloudflare fronts it at
-  `api.koonporza.com` (see Phase 10).
+  `0.0.0.0`, so it runs on Railway as-is. **Railway does NOT auto-deploy from
+  `main`** (no GitHub integration on the service) — ship backend changes with
+  `railway up --service trip-gps-api` from the repo root. Custom domain
+  `api.koonporza.com`.
 
-> Why Workers and not "Cloudflare Pages"? For a Next.js app with SSR + Node
-> route handlers, Cloudflare's current, documented path is **Workers + OpenNext**.
-> The classic Pages `@cloudflare/next-on-pages` adapter is legacy and can't run
-> this app's `runtime = "nodejs"` routes (they use `node:crypto`). "Hosting the
-> site on Cloudflare" = a Worker.
+> **Deploy at a glance:** push to `main` → **Vercel** rebuilds the frontend
+> automatically. Backend changes → run **`railway up`** manually (a `main` push
+> does NOT update Railway). `NEXT_PUBLIC_*` are inlined at Vercel build time, so an
+> env-only change needs a rebuild.
 
 ## 0. Prerequisites
 
@@ -32,7 +37,11 @@ git branch -M main
 git push -u origin main
 ```
 
-## 2. Deploy `apps/web` to Cloudflare Workers
+## 2. Deploy `apps/web` to Cloudflare Workers (ALTERNATE — not the live host)
+
+> **The live production frontend is Vercel** (see the intro): it deploys on push
+> to `main`, no steps needed here. This section is the alternate Cloudflare Workers
+> path — skip it unless you are migrating off Vercel.
 
 The repo is already wired for OpenNext:
 
