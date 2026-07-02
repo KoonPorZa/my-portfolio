@@ -163,4 +163,49 @@ grant execute on function public.trip_gps_retention_cleanup(interval)
 -- 24 and 72 hours for the MVP, for example:
 -- select public.trip_gps_retention_cleanup(interval '72 hours');
 
+-- ---------------------------------------------------------------------------
+-- Public (anon) read access for the token-less live viewer (/trip/001/live).
+-- The viewer is intentionally public: it reads the latest point (presence),
+-- the travelled breadcrumb (trip_location_points), and the arrival timeline
+-- (trip_stop_arrivals). Only these non-sensitive tables are exposed to anon —
+-- trip_share_sessions (owner/viewer token hashes) stays private. Idempotent.
+-- ---------------------------------------------------------------------------
+drop policy if exists trip_location_latest_anon_select on public.trip_location_latest;
+create policy trip_location_latest_anon_select
+  on public.trip_location_latest for select to anon using (true);
+
+drop policy if exists trip_location_points_anon_select on public.trip_location_points;
+create policy trip_location_points_anon_select
+  on public.trip_location_points for select to anon using (true);
+
+drop policy if exists trip_stop_arrivals_anon_select on public.trip_stop_arrivals;
+create policy trip_stop_arrivals_anon_select
+  on public.trip_stop_arrivals for select to anon using (true);
+
+-- Realtime publication membership so the browser receives changes on these
+-- tables. Guarded so re-running does not error on an already-added table.
+do $$
+declare
+  target text;
+begin
+  foreach target in array array[
+    'trip_location_latest',
+    'trip_location_points',
+    'trip_stop_arrivals'
+  ]
+  loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = target
+    ) then
+      execute format(
+        'alter publication supabase_realtime add table public.%I',
+        target
+      );
+    end if;
+  end loop;
+end $$;
+
 commit;

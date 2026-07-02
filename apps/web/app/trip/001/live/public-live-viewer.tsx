@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import { WeatherNow } from "@/components/weather-now";
 import { buildTimedStops, TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
 import { useLiveLocation } from "@/lib/trip-gps/use-live-location";
@@ -75,6 +76,7 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
 
   const live = state.status === "live" ? state.loc : null;
   const track = state.track;
+  const stopArrivals = state.stopArrivals;
   const ageMs = live ? ageMsFrom(live.serverTs, nowMs) : null;
   const mapsHref = live ? mapsLink(live.lat, live.lng) : null;
 
@@ -132,6 +134,16 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
             </a>
           </header>
           <TripRouteMap live={live ? { lat: live.lat, lng: live.lng } : null} actualTrack={track} />
+        </section>
+
+        <section className={styles.routePanel} aria-labelledby="timeline-title">
+          <header className={styles.routeHeader}>
+            <div>
+              <p className={styles.eyebrow}>Arrival timeline</p>
+              <h2 id="timeline-title">ไทม์ไลน์การถึงจุดพัก</h2>
+            </div>
+          </header>
+          <TripProgressTimeline arrivals={stopArrivals} />
         </section>
 
         <div className={styles.locationGrid}>
