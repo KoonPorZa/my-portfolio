@@ -21,9 +21,19 @@ type TripLiveSearchParams = Promise<{ [key: string]: string | string[] | undefin
 
 export const dynamic = "force-dynamic";
 
+const PAGE_TITLE = "Trip 01 · ตำแหน่งสด — สงขลา→กรุงเทพฯ";
+const PAGE_DESCRIPTION =
+  "ติดตามตำแหน่งสดระหว่างทริปสงขลา→กรุงเทพฯ แบบ realtime — เปิดแล้วหน้าจะอัปเดตเอง ไม่ต้องรีเฟรช";
+
 export const metadata: Metadata = {
-  title: "Live GPS — Trip 01",
-  description: "Read-only live location viewer for Trip 01 from Songkhla to Bangkok.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    locale: "th_TH",
+    type: "website",
+  },
   robots: { index: false, follow: false },
 };
 

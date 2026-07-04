@@ -424,6 +424,21 @@
   background: linear-gradient(135deg, var(--card), var(--danger-tint));
 }
 
+.liveStatusStale {
+  border-color: rgba(207, 69, 28, 0.35);
+  background: linear-gradient(135deg, var(--card), var(--accent-tint));
+}
+
+.liveStatusLost {
+  border-color: var(--line-strong);
+  background: linear-gradient(135deg, var(--card), var(--paper-2));
+}
+
+.liveStatusArrived {
+  border-color: rgba(47, 107, 65, 0.4);
+  background: linear-gradient(135deg, var(--card), var(--rest-tint));
+}
+
 .liveStatusHead {
   display: flex;
   align-items: center;
@@ -443,6 +458,24 @@
   background: var(--danger-tint);
   border-radius: 999px;
   padding: 3px 9px;
+}
+
+.liveBadgeStale {
+  color: var(--accent-deep);
+  border-color: rgba(207, 69, 28, 0.35);
+  background: var(--accent-tint);
+}
+
+.liveBadgeLost {
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+  background: var(--paper-2);
+}
+
+.liveBadgeArrived {
+  color: var(--rest);
+  border-color: rgba(47, 107, 65, 0.35);
+  background: var(--rest-tint);
 }
 
 .liveBadgeDot {

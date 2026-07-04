@@ -16,10 +16,19 @@ const mono = IBM_Plex_Mono({
   display: "swap",
 });
 
+const PAGE_TITLE = "Trip 01 · สงขลา→กรุงเทพฯ — แผนเดินทาง";
+const PAGE_DESCRIPTION =
+  "แผนทริปมอเตอร์ไซค์วันเดียว สงขลา→กรุงเทพฯ: จุดพักทั้ง 10 จุด เวลาถึงโดยประมาณ และพยากรณ์อากาศตามเวลาถึงแต่ละจุด";
+
 export const metadata: Metadata = {
-  title: "Trip 01 — R15v3 Roadbook",
-  description:
-    "Private R15v3 roadbook from Songkhla to Bangkok with PTT stops, budget, and mobile-first checklist.",
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    locale: "th_TH",
+    type: "website",
+  },
   robots: { index: false, follow: false },
 };
 
