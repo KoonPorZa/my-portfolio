@@ -13,7 +13,7 @@ import {
 } from "@/lib/trip-gps/types";
 import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import { WeatherNow } from "@/components/weather-now";
-import { buildTimedStops, TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
+import { TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
 import { tripGpsApiBase } from "@/lib/trip-gps/api-base";
 import { TripRouteMap } from "./route-map";
 import styles from "./live.module.css";
@@ -63,8 +63,6 @@ const viewerStates = new Set<ViewerState>([
 const freshnessValues = new Set<LocationFreshness>(["fresh", "stale", "offline"]);
 const trackerModes = new Set<TrackerMode>(TRACKER_MODES);
 const uploadReasons = new Set<UploadReason>(["scheduled", "manual", "start", "stop", "retry"]);
-const routeStops = buildTimedStops();
-const routeTotalKm = Math.round(routeStops.at(-1)?.cumulativeKm ?? 0);
 
 const stateCopy: Record<ViewerState, StateCopy> = {
   loading: {
@@ -348,39 +346,6 @@ export function LiveViewer({ token, fontClassName }: LiveViewerProps) {
         </div>
 
         <TripProgressTimeline arrivals={stopArrivals} />
-
-        <section className={styles.routePanel} aria-labelledby="route-title">
-          <header className={styles.routeHeader}>
-            <div>
-              <p className={styles.eyebrow}>Route stops</p>
-              <h2 id="route-title">สรุปจุดพักหลัก</h2>
-            </div>
-            <dl className={styles.routeStats}>
-              <div>
-                <dt>รวม</dt>
-                <dd>~{routeTotalKm.toLocaleString("th-TH")} กม.</dd>
-              </div>
-              <div>
-                <dt>จุดพัก</dt>
-                <dd>{routeStops.length} จุด</dd>
-              </div>
-            </dl>
-          </header>
-
-          <ol className={styles.stopList}>
-            {routeStops.map((stop, index) => (
-              <li key={stop.name} className={styles.stopItem}>
-                <span className={styles.stopNo}>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <h3>{stop.name}</h3>
-                  <p>{stop.place}</p>
-                  <span>{stop.role}</span>
-                </div>
-                <strong>~{Math.round(stop.cumulativeKm)} กม.</strong>
-              </li>
-            ))}
-          </ol>
-        </section>
       </div>
     </main>
   );

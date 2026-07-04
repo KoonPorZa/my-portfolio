@@ -188,6 +188,11 @@ are your only real spend ceiling. Read the whole section before enabling.**
 > resets on every Railway restart/redeploy (and multiplies per replica), and it
 > does not cover the browser Maps JS key at all.
 
+> 📌 The Google Cloud project for all of this is named **`jadkarnmoney`** — it is
+> NOT named after this repo. It's an old project reused because billing was
+> already set up on it. Select that project in the console; the maps keys,
+> quotas, and billing all live there.
+
 1. **Enable APIs & create two SEPARATE, restricted keys** in Google Cloud console:
    - Enable **Routes API** and **Maps JavaScript API**.
    - Create **two separate keys** (one per API) — never reuse one key for both.

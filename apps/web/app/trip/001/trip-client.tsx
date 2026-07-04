@@ -21,7 +21,7 @@ import styles from "./trip.module.css";
 const principles = [
   [
     "ออก 04:00 = ถึงเย็น",
-    "รักษา 80–100 กม./ชม. + พักตามแผน → ถึง PTT รามคำแหงราว 18:50 (เผื่อรถติดเป็น 19:30–20:00)",
+    "รักษา 80–100 กม./ชม. + พักตามแผน → ถึง PTT รามคำแหงราว 18:40 (เผื่อรถติดเป็น 19:30–20:00)",
   ],
   [
     "เติมทุกครั้งที่พัก",
@@ -34,17 +34,17 @@ const principles = [
 ] as const;
 
 const budgetItems = [
-  ["น้ำมัน Gasohol 95 (40 กม./ลิตร + เผื่อ 10%)", "≈1,075฿"],
+  ["น้ำมัน Gasohol 95 (40 กม./ลิตร + เผื่อ 10%)", "≈1,060฿"],
   ["อาหาร/น้ำ 7‑Eleven แบบกินนิ่มทั้งวัน", "≈450–650฿"],
   ["เงินเผื่อฉุกเฉินเล็กน้อย", "≈300–500฿"],
   ["รวมแนะนำสำหรับวันเดียว", "≈1,825–2,225฿"],
 ] as const;
 
 const fuelRows = [
-  ["กินมาก 35 กม./ลิตร", "≈29.0 ลิตร", "≈1,115฿", "≈1,225฿", "worst case: 80–100 กม./ชม. + ลมต้าน + สัมภาระ"],
-  ["ค่ากลาง 40 กม./ลิตร", "≈25.4 ลิตร", "≈976฿", "≈1,075฿", "ใช้เป็นงบหลักของแผนนี้"],
-  ["ประหยัด 45 กม./ลิตร", "≈22.5 ลิตร", "≈867฿", "≈954฿", "ขี่นิ่ง รถเบา ถนนโล่ง"],
-  ["E20 @ 33.48 (ถ้าใช้ได้จริง)", "≈25.4 ลิตร", "≈849฿", "≈934฿", "เฉพาะถ้ารถรองรับและใช้ประจำ"],
+  ["กินมาก 35 กม./ลิตร", "≈28.6 ลิตร", "≈1,100฿", "≈1,210฿", "worst case: 80–100 กม./ชม. + ลมต้าน + สัมภาระ"],
+  ["ค่ากลาง 40 กม./ลิตร", "≈25.0 ลิตร", "≈962฿", "≈1,060฿", "ใช้เป็นงบหลักของแผนนี้"],
+  ["ประหยัด 45 กม./ลิตร", "≈22.2 ลิตร", "≈855฿", "≈940฿", "ขี่นิ่ง รถเบา ถนนโล่ง"],
+  ["E20 @ 33.48 (ถ้าใช้ได้จริง)", "≈25.0 ลิตร", "≈837฿", "≈921฿", "เฉพาะถ้ารถรองรับและใช้ประจำ"],
 ] as const;
 
 const checklist = [
@@ -349,7 +349,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <div className={styles.clusterCell}>
               <dt>ระยะรวม</dt>
               <dd>
-                ~1,014 <span>กม.</span>
+                ~1,000 <span>กม.</span>
               </dd>
             </div>
             <div className={styles.clusterCell}>
@@ -359,7 +359,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <div className={styles.clusterCell}>
               <dt>ถึงโดยประมาณ</dt>
               <dd>
-                18:53 <span>–20:00</span>
+                18:40 <span>–20:00</span>
               </dd>
             </div>
             <div className={styles.clusterCell}>
@@ -410,7 +410,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <article className={styles.planCard}>
               <span className={styles.planTag}>แผน A · วันเดียว</span>
               <p>
-                ออก 04:00 → ถึง PTT รามคำแหงราว <strong>18:53</strong> ถ้าพักตามแผนและถนนไม่ติดหนัก
+                ออก 04:00 → ถึง PTT รามคำแหงราว <strong>18:40</strong> ถ้าพักตามแผนและถนนไม่ติดหนัก
               </p>
             </article>
             <article className={cx(styles.planCard, styles.planCardWarn)}>
@@ -431,7 +431,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             index="02"
             eyebrow="PTT stops"
             title="ไทม์ไลน์จุดเติม + พัก"
-            lead="ระยะและ ETA คำนวณจากเวลาออก 04:00, ระยะระหว่าง waypoint และสปีดขี่จริงต่อช่วงทาง — ตัวเลขทุกค่าเป็นชุดเดิม"
+            lead="ระยะและ ETA คำนวณจากเวลาออก 04:00, ระยะระหว่าง waypoint และสปีดขี่จริงต่อช่วงทาง — ตัวเลขทุกค่าอัปเดตตาม waypoint ปัจจุบัน"
           />
           <ol className={styles.timeline}>
             {TIMED_STOPS.map((stop, index) => (
@@ -451,7 +451,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             index="03"
             eyebrow="Trip budget"
             title="งบน้ำมัน + 7‑Eleven"
-            lead="คำนวณจากระยะผ่าน waypoint ~1,014 กม. และสมมติฐาน R15v3 วิ่งจริง 35–45 กม./ลิตร"
+            lead="คำนวณจากระยะผ่าน waypoint ~1,000 กม. โดยเริ่มนับ 0 กม. ที่ PTT ม่วงงาม และสมมติฐาน R15v3 วิ่งจริง 35–45 กม./ลิตร"
           />
           <div className={styles.budgetWrap}>
             <article className={styles.budgetHero}>
@@ -517,7 +517,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             หรือฝนหนัก ให้เปลี่ยนเป็นแผนค้างคืนทันที
           </p>
           <p className={styles.footerMeta}>
-            ETA: ออก 04:00 · ทางท้องถิ่น 50 · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม. · ขี่รวม ~11ชม.48น.
+            ETA: ออก 04:00 · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม. · ขี่รวม ~11ชม.35น.
             + พัก ~3ชม.05น.
           </p>
         </footer>

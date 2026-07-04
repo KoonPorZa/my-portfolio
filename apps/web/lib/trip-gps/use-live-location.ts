@@ -225,6 +225,40 @@ export function useLiveLocation(): LiveState {
       loadArrivals(sessionId);
     };
 
+    // With no active session there is no live row to learn the session id
+    // from, so pull the most recent arrivals and keep only the newest
+    // session's rows — this is what lets the "arrived" state survive the
+    // owner ending the share.
+    const loadLatestSessionArrivals = () => {
+      void supabase
+        .from("trip_stop_arrivals")
+        .select("session_id,stop_index,arrived_at,source")
+        .order("arrived_at", { ascending: false })
+        .limit(60)
+        .then(({ data }) => {
+          if (!subscribed || sessionIdRef.current) {
+            return;
+          }
+
+          const rows = (data ?? []).flatMap((row) => {
+            const arrival = toStopArrival(row as Record<string, unknown>);
+            return arrival ? [arrival] : [];
+          });
+          const latestSessionId = rows[0]?.sessionId;
+
+          if (!latestSessionId) {
+            return;
+          }
+
+          const stopArrivals = rows
+            .filter((row) => row.sessionId === latestSessionId)
+            .map(({ index, arrivedAt, source }) => ({ index, arrivedAt, source }))
+            .sort((a, b) => a.index - b.index);
+
+          setState((current) => ({ ...current, stopArrivals }));
+        });
+    };
+
     void supabase
       .from("trip_location_latest")
       .select("session_id,lat,lng,accuracy_m,speed_mps,heading_deg,mode,client_ts,server_ts")
@@ -245,6 +279,8 @@ export function useLiveLocation(): LiveState {
 
         if (loc?.sessionId) {
           loadSessionExtras(loc.sessionId);
+        } else {
+          loadLatestSessionArrivals();
         }
       });
 

@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 
 import { TripProgressTimeline } from "@/components/trip-progress-timeline";
 import { WeatherNow } from "@/components/weather-now";
-import { buildTimedStops, TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
+import { TRIP_DIRECTIONS_URL } from "@/lib/trip-stops";
+import {
+  formatAge,
+  liveStatusCopy,
+  locationAgeMs,
+  type LiveStatusTone,
+} from "@/lib/trip-gps/live-status-copy";
 import { useLiveLocation } from "@/lib/trip-gps/use-live-location";
 import { TripRouteMap } from "./route-map";
 import styles from "./live.module.css";
-
-const routeStops = buildTimedStops();
-const routeTotalKm = Math.round(routeStops.at(-1)?.cumulativeKm ?? 0);
-const MINUTE_MS = 60_000;
-const HOUR_MS = 60 * MINUTE_MS;
 
 const MODE_LABEL: Record<string, string> = {
   active: "ปกติ",
@@ -20,9 +21,6 @@ const MODE_LABEL: Record<string, string> = {
   rest: "พัก",
   city: "ในเมือง",
 };
-
-type Tone = "green" | "yellow" | "redGray" | "gray";
-type Copy = { badge: string; title: string; body: string; tone: Tone };
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -32,27 +30,7 @@ function mapsLink(lat: number, lng: number) {
   return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
 }
 
-function ageMsFrom(serverTs: string | null, nowMs: number): number | null {
-  if (!serverTs) {
-    return null;
-  }
-  const ts = Date.parse(serverTs);
-  return Number.isFinite(ts) ? Math.max(0, nowMs - ts) : null;
-}
-
-function formatAge(ms: number): string {
-  if (ms < MINUTE_MS) {
-    return "น้อยกว่า 1 นาที";
-  }
-  if (ms < HOUR_MS) {
-    return `${Math.floor(ms / MINUTE_MS)} นาที`;
-  }
-  const hours = Math.floor(ms / HOUR_MS);
-  const minutes = Math.floor((ms % HOUR_MS) / MINUTE_MS);
-  return minutes > 0 ? `${hours} ชม. ${minutes} นาที` : `${hours} ชม.`;
-}
-
-function badgeToneClass(tone: Tone): string {
+function badgeToneClass(tone: LiveStatusTone): string {
   switch (tone) {
     case "green":
       return styles.badgeGreen;
@@ -77,25 +55,10 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
   const live = state.status === "live" ? state.loc : null;
   const track = state.track;
   const stopArrivals = state.stopArrivals;
-  const ageMs = live ? ageMsFrom(live.serverTs, nowMs) : null;
+  const copy = liveStatusCopy(state, nowMs);
+  const ageMs = live ? locationAgeMs(live.serverTs, nowMs) : null;
   const mapsHref = live ? mapsLink(live.lat, live.lng) : null;
-
-  let copy: Copy;
-  if (live) {
-    if (ageMs != null && ageMs >= 30 * MINUTE_MS) {
-      copy = { badge: "ขาดสัญญาณ", title: "ตำแหน่งล่าสุด (last known)", body: "ข้อมูลเกิน 30 นาที อาจอยู่จุดอับสัญญาณ แบตหมด หรือหยุดส่งตำแหน่ง", tone: "redGray" };
-    } else if (ageMs != null && ageMs >= 15 * MINUTE_MS) {
-      copy = { badge: "เริ่มเก่า", title: "ตำแหน่งล่าสุด (last known)", body: "ข้อมูลเกิน 15 นาทีแล้ว ใช้เป็นจุดล่าสุดเท่านั้น ไม่ใช่ตำแหน่งสด", tone: "yellow" };
-    } else {
-      copy = { badge: "สด", title: "กำลังแชร์ตำแหน่งสด", body: "รับตำแหน่งแบบ realtime — หน้านี้อัปเดตเองเมื่อมีจุดใหม่ ไม่ต้องรีเฟรช", tone: "green" };
-    }
-  } else if (state.status === "unavailable") {
-    copy = { badge: "ไม่พร้อม", title: "ยังไม่ได้ตั้งค่าการติดตามสด", body: "ระบบ realtime ยังไม่พร้อมใช้งานในตอนนี้", tone: "redGray" };
-  } else if (state.status === "connecting") {
-    copy = { badge: "กำลังเชื่อมต่อ", title: "กำลังเชื่อมต่อ", body: "กำลังตรวจสอบว่ามีการแชร์ตำแหน่งอยู่หรือไม่", tone: "gray" };
-  } else {
-    copy = { badge: "ยังไม่แชร์", title: "ยังไม่มีการแชร์ตำแหน่งตอนนี้", body: "หน้านี้จะขึ้นเองแบบ realtime เมื่อเจ้าของทริปเริ่มแชร์ — ไม่ต้องรีเฟรช", tone: "gray" };
-  }
+  const latestTitle = copy.kind === "stale" || copy.kind === "lost" ? "ตำแหน่งล่าสุด (last known)" : "ตำแหน่งล่าสุด";
 
   return (
     <main className={cx(styles.liveRoot, fontClassName)}>
@@ -108,20 +71,10 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
           <h1 className={styles.heroTitle}>
             สงขลา<span>→</span>กรุงเทพฯ
           </h1>
-          <p className={styles.heroLead}>
-            ติดตามตำแหน่งสดแบบ realtime — หน้านี้อัปเดตเองเมื่อเจ้าของทริปแชร์ ไม่ต้องรีเฟรชและไม่ต้องใช้ลิงก์ลับ
+          <p className={styles.heroLead} aria-live="polite">
+            <strong>{copy.title}</strong> — {copy.body}
           </p>
         </header>
-
-        <section className={styles.statusPanel} aria-labelledby="viewer-state-title" aria-live="polite">
-          <div className={styles.panelHeader}>
-            <div>
-              <p className={styles.eyebrow}>GPS state</p>
-              <h2 id="viewer-state-title">{copy.title}</h2>
-            </div>
-          </div>
-          <p className={styles.stateCopy}>{copy.body}</p>
-        </section>
 
         <section className={styles.routePanel} aria-labelledby="route-map-title">
           <header className={styles.routeHeader}>
@@ -136,22 +89,14 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
           <TripRouteMap live={live ? { lat: live.lat, lng: live.lng } : null} actualTrack={track} />
         </section>
 
-        <section className={styles.routePanel} aria-labelledby="timeline-title">
-          <header className={styles.routeHeader}>
-            <div>
-              <p className={styles.eyebrow}>Arrival timeline</p>
-              <h2 id="timeline-title">ไทม์ไลน์การถึงจุดพัก</h2>
-            </div>
-          </header>
-          <TripProgressTimeline arrivals={stopArrivals} />
-        </section>
+        <TripProgressTimeline arrivals={stopArrivals} />
 
         <div className={styles.locationGrid}>
           <section className={styles.pointPanel} aria-labelledby="latest-point-title">
             <div className={styles.panelHeader}>
               <div>
                 <p className={styles.eyebrow}>Latest point</p>
-                <h2 id="latest-point-title">{live ? copy.title : "ตำแหน่งล่าสุด"}</h2>
+                <h2 id="latest-point-title">{latestTitle}</h2>
               </div>
               {mapsHref ? (
                 <a className={styles.mapButton} href={mapsHref} target="_blank" rel="noreferrer">
@@ -203,39 +148,6 @@ export function PublicLiveViewer({ fontClassName }: { fontClassName: string }) {
 
           {live ? <WeatherNow lat={live.lat} lon={live.lng} /> : null}
         </div>
-
-        <section className={styles.routePanel} aria-labelledby="route-title">
-          <header className={styles.routeHeader}>
-            <div>
-              <p className={styles.eyebrow}>Route stops</p>
-              <h2 id="route-title">สรุปจุดพักหลัก</h2>
-            </div>
-            <dl className={styles.routeStats}>
-              <div>
-                <dt>รวม</dt>
-                <dd>~{routeTotalKm.toLocaleString("th-TH")} กม.</dd>
-              </div>
-              <div>
-                <dt>จุดพัก</dt>
-                <dd>{routeStops.length} จุด</dd>
-              </div>
-            </dl>
-          </header>
-
-          <ol className={styles.stopList}>
-            {routeStops.map((stop, index) => (
-              <li key={stop.name} className={styles.stopItem}>
-                <span className={styles.stopNo}>{String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <h3>{stop.name}</h3>
-                  <p>{stop.place}</p>
-                  <span>{stop.role}</span>
-                </div>
-                <strong>~{Math.round(stop.cumulativeKm)} กม.</strong>
-              </li>
-            ))}
-          </ol>
-        </section>
       </div>
     </main>
   );

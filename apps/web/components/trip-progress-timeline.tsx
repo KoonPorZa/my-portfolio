@@ -78,31 +78,26 @@ export function TripProgressTimeline({
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Plan / Actual</p>
-          <h2 id="trip-progress-title">ความคืบหน้า</h2>
+          <h2 id="trip-progress-title">ไทม์ไลน์การถึงจุดพัก</h2>
         </div>
-        <span className={styles.progressBadge}>{progressPercent}%</span>
+        <span className={styles.progressBadge}>
+          ถึงแล้ว {reachedCount}/{TRIP_STOP_COUNT} จุด
+        </span>
       </header>
-
-      <dl className={styles.summaryGrid} aria-label="สรุปความคืบหน้าทริป">
-        <div>
-          <dt>ถึงแล้ว</dt>
-          <dd>
-            {reachedCount}/{TRIP_STOP_COUNT} จุด
-          </dd>
-        </div>
-        <div>
-          <dt>คืบหน้า</dt>
-          <dd>{progressPercent}%</dd>
-        </div>
-        <div className={styles.summaryWide}>
-          <dt>{nextStopIndex === -1 ? "สถานะ" : "จุดถัดไป"}</dt>
-          <dd>{currentStopCopy}</dd>
-        </div>
-      </dl>
 
       <div className={styles.progressTrack} aria-hidden="true">
         <span style={{ width: `${progressPercent}%` }} />
       </div>
+
+      <p className={styles.nextLine}>
+        {nextStopIndex === -1 ? (
+          "ถึงครบทุกจุดแล้ว"
+        ) : (
+          <>
+            จุดถัดไป <strong>{currentStopCopy}</strong>
+          </>
+        )}
+      </p>
 
       {statusMessage ? <p className={styles.notice}>{statusMessage}</p> : null}
       {errorMessage ? <p className={styles.error}>{errorMessage}</p> : null}
@@ -110,7 +105,7 @@ export function TripProgressTimeline({
       <ol className={styles.stopList}>
         {TIMED_STOPS.map((stop, index) => {
           const arrival = arrivalsByIndex.get(index) ?? null;
-          const delta = arrival ? deltaCopy(stop.arriveMinutes, arrival.arrivedAt) : pendingDelta();
+          const delta = arrival ? deltaCopy(stop.arriveMinutes, arrival.arrivedAt) : null;
           const isCurrent = index === currentStopIndex;
           const isBusy = controls?.busyStopIndex === index;
           const inputValue =
@@ -129,10 +124,7 @@ export function TripProgressTimeline({
 
               <div className={styles.stopBody}>
                 <div className={styles.stopTop}>
-                  <div>
-                    <h3>{stop.name}</h3>
-                    <p>{stop.place}</p>
-                  </div>
+                  <h3>{stop.name}</h3>
                   {isCurrent ? (
                     <span className={styles.currentPill}>
                       {nextStopIndex === -1 ? "ครบเส้นทาง" : "จุดถัดไป"}
@@ -140,35 +132,30 @@ export function TripProgressTimeline({
                   ) : null}
                 </div>
 
-                <dl className={styles.timeGrid}>
-                  <div>
-                    <dt>แผนถึง</dt>
-                    <dd>{stop.arrive} น.</dd>
-                  </div>
-                  <div>
-                    <dt>ถึงจริง</dt>
-                    <dd className={!arrival ? styles.pendingText : undefined}>
-                      {arrival ? formatBangkokTime(arrival.arrivedAt) : "ยังไม่ถึง"}
-                    </dd>
-                    {arrival ? (
-                      <span className={styles.sourceText}>
-                        {arrival.source === "auto" ? "GPS อัตโนมัติ" : "เจ้าของแก้มือ"}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div>
-                    <dt>เทียบแผน</dt>
-                    <dd>
-                      <span className={cx(styles.deltaBadge, deltaToneClass(delta.tone))}>
-                        {delta.label}
-                      </span>
-                    </dd>
-                  </div>
-                </dl>
-
-                <p className={styles.stopMeta}>
-                  {stop.role} · ถึงสะสม ~{Math.round(stop.cumulativeKm)} กม.
+                <p className={styles.stopPlace}>
+                  {stop.place} · ~{Math.round(stop.cumulativeKm)} กม.
                 </p>
+
+                <p className={styles.timeLine}>
+                  <span className={styles.timePlan}>แผน {stop.arrive} น.</span>
+                  <span className={styles.timeArrow} aria-hidden="true">
+                    →
+                  </span>
+                  {arrival ? (
+                    <span className={styles.timeActual}>ถึงจริง {formatBangkokTime(arrival.arrivedAt)}</span>
+                  ) : (
+                    <span className={styles.timePending}>ยังไม่ถึง</span>
+                  )}
+                  {delta ? (
+                    <span className={cx(styles.deltaBadge, deltaToneClass(delta.tone))}>{delta.label}</span>
+                  ) : null}
+                </p>
+
+                {arrival ? (
+                  <p className={styles.sourceText}>
+                    {arrival.source === "auto" ? "GPS อัตโนมัติ" : "เจ้าของแก้มือ"}
+                  </p>
+                ) : null}
 
                 {controls ? (
                   <div className={styles.controls} aria-label={`แก้เวลาถึงจริง ${stop.name}`}>
@@ -251,13 +238,6 @@ function arrivalMap(arrivals: StopArrival[]): Map<number, StopArrival> {
   }
 
   return map;
-}
-
-function pendingDelta(): DeltaCopy {
-  return {
-    label: "ยังไม่ถึง",
-    tone: "muted",
-  };
 }
 
 function deltaCopy(plannedMinutes: number, arrivedAt: string): DeltaCopy {
