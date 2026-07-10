@@ -7,6 +7,7 @@ import {
   WEATHER_FORECAST_MAX_DAYS,
   describeWeather,
   fetchStopsForecast,
+  forecastSampleTime,
   formatThaiShortDate,
   pickForecastAtHour,
   type ForecastWeather,
@@ -14,14 +15,14 @@ import {
   type WeatherDescription,
   type WeatherTone,
 } from "@/lib/weather";
-import { buildTimedStops, duration, type TimedStop } from "@/lib/trip-stops";
+import { buildTimedStops, duration, toHHMM, type TimedStop } from "@/lib/trip-stops";
 import { TripLiveStatus } from "./live-status";
 import styles from "./trip.module.css";
 
 const principles = [
   [
-    "ออก 04:00 = ถึงเย็น",
-    "รักษา 80–100 กม./ชม. + พักตามแผน → ถึง PTT รามคำแหงราว 18:40 (เผื่อรถติดเป็น 19:30–20:00)",
+    "ยึดจังหวะ ออกเที่ยง–นอนท่าแซะ",
+    "ออก 12:00 วันที่ 12 จากสงขลา นอนจัมโบ้ เฮาส์ ในปั๊ม ปตท. ท่าแซะ แล้วออกต่อ 06:30 เช้าวันที่ 13",
   ],
   [
     "เติมทุกครั้งที่พัก",
@@ -36,8 +37,8 @@ const principles = [
 const budgetItems = [
   ["น้ำมัน Gasohol 95 (40 กม./ลิตร + เผื่อ 10%)", "≈1,060฿"],
   ["อาหาร/น้ำ 7‑Eleven แบบกินนิ่มทั้งวัน", "≈450–650฿"],
+  ["ที่พักจัมโบ้ เฮาส์ ท่าแซะ 1 คืน", "≈500–600฿"],
   ["เงินเผื่อฉุกเฉินเล็กน้อย", "≈300–500฿"],
-  ["รวมแนะนำสำหรับวันเดียว", "≈1,825–2,225฿"],
 ] as const;
 
 const fuelRows = [
@@ -65,16 +66,33 @@ function mapsLink([lat, lon]: [number, number]) {
 }
 
 const TIMED_STOPS = buildTimedStops();
+const PLAN_C_START_DATE = "2026-07-12";
+const PLAN_C_SECOND_DAY_DATE = "2026-07-13";
+const PLAN_C_OVERNIGHT_STOP_INDEX = 4;
+const PLAN_C_SECOND_DAY_START_MINUTES = 6 * 60 + 30;
+const PLAN_C_HOTEL_COORDS: [number, number] = [10.6952981, 99.2053037];
+const PLAN_C_TIMELINE = buildSplitTimeline(TIMED_STOPS, {
+  overnightStopIndex: PLAN_C_OVERNIGHT_STOP_INDEX,
+  firstDayStartMinutes: 12 * 60,
+  secondDayStartMinutes: PLAN_C_SECOND_DAY_START_MINUTES,
+  secondDayFirstLegMinutes: 80,
+  overnightRole: "จบทริปวันแรก / ไปโรงแรมจัมโบ้ เฮาส์ ท่าแซะ",
+  overnightNote:
+    "แวะหรือขี่ผ่านก็ได้ จากปั๊มนี้ขี่ต่ออีกประมาณ 22 กม. / 15 นาทีถึงจัมโบ้ เฮาส์ ซึ่งอยู่ในปั๊ม ปตท. ท่าแซะ — ช่วงท้ายฟ้ามืดแล้ว เปิดไฟและลดความเร็ว",
+});
+const PLAN_C_TIMED_STOPS = [...PLAN_C_TIMELINE.dayOne, ...PLAN_C_TIMELINE.dayTwo];
 const FORECAST_POINTS = TIMED_STOPS.map((stop) => ({
   lat: stop.coords[0],
   lon: stop.coords[1],
 }));
 const DAY_MS = 24 * 60 * 60 * 1_000;
 const WEATHER_START_DATE = WEATHER_FORECAST_DATES[0];
-const WEATHER_END_DATE = WEATHER_FORECAST_DATES[WEATHER_FORECAST_DATES.length - 1];
+const WEATHER_FETCH_START_DATE = PLAN_C_START_DATE;
+const LAST_DEPARTURE_DATE = WEATHER_FORECAST_DATES[WEATHER_FORECAST_DATES.length - 1] ?? WEATHER_START_DATE;
+const WEATHER_END_DATE = shiftDateKey(LAST_DEPARTURE_DATE, 1) ?? LAST_DEPARTURE_DATE;
 
 const TAG_ACCENT = new Set(["Start", "เติมเต็มถัง", "สำคัญ", "ก่อนเข้าเมือง", "Finish"]);
-const TAG_REST = new Set(["Day run", "พักคน", "พักรถ", "พักสั้น", "Breakfast", "Lunch"]);
+const TAG_REST = new Set(["Day run", "พักคน", "พักรถ", "พักสั้น", "พักค้างคืน", "Breakfast", "Lunch"]);
 const TAG_DANGER = new Set(["Decision"]);
 
 type ForecastState =
@@ -168,15 +186,22 @@ function RouteWeatherSummary({
 function StopWeather({
   status,
   forecast,
+  dateKey,
+  stop,
 }: {
   status: ForecastStatus;
   forecast: ForecastWeather | null;
+  dateKey: string;
+  stop: TimedStop;
 }) {
+  const forecastContext = <ForecastContext dateKey={dateKey} stop={stop} />;
+
   if (status === "loading") {
     return (
       <div className={cx(styles.stopWeather, styles.stopWeatherMuted)} aria-live="polite">
         <span className={styles.stopWeatherKicker}>พยากรณ์เวลาถึง</span>
         <span className={styles.stopWeatherEmpty}>กำลังโหลดอากาศตามเวลาถึง</span>
+        {forecastContext}
       </div>
     );
   }
@@ -186,6 +211,7 @@ function StopWeather({
       <div className={cx(styles.stopWeather, styles.stopWeatherMuted)} aria-live="polite">
         <span className={styles.stopWeatherKicker}>พยากรณ์เวลาถึง</span>
         <span className={styles.stopWeatherEmpty}>เปิดพยากรณ์ไม่ได้ตอนนี้</span>
+        {forecastContext}
       </div>
     );
   }
@@ -195,6 +221,7 @@ function StopWeather({
       <div className={cx(styles.stopWeather, styles.stopWeatherMuted)} aria-live="polite">
         <span className={styles.stopWeatherKicker}>พยากรณ์เวลาถึง</span>
         <span className={styles.stopWeatherEmpty}>ยังไม่มีข้อมูลพยากรณ์ / ใกล้วันเดินทางจะแม่นขึ้น</span>
+        {forecastContext}
       </div>
     );
   }
@@ -204,6 +231,7 @@ function StopWeather({
       <div className={cx(styles.stopWeather, styles.stopWeatherMuted)} aria-live="polite">
         <span className={styles.stopWeatherKicker}>พยากรณ์เวลาถึง</span>
         <span className={styles.stopWeatherEmpty}>ไม่มีข้อมูลชั่วโมงนี้</span>
+        {forecastContext}
       </div>
     );
   }
@@ -219,6 +247,7 @@ function StopWeather({
         <span className={styles.stopWeatherKicker}>พยากรณ์เวลาถึง</span>
         <span className={styles.stopWeatherLabel}>{description.label}</span>
       </div>
+      {forecastContext}
       <div className={styles.stopWeatherMetrics}>
         <span>{Math.round(forecast.tempC)}°C</span>
         <span>ฝน {Math.round(forecast.precipProb)}%</span>
@@ -228,16 +257,35 @@ function StopWeather({
   );
 }
 
+function ForecastContext({ dateKey, stop }: { dateKey: string; stop: TimedStop }) {
+  const sampleTime = forecastSampleTime(stop.arrive) ?? stop.arrive;
+
+  return (
+    <div className={styles.stopWeatherContext}>
+      <div className={styles.stopWeatherContextMeta}>
+        <span>{formatThaiShortDate(dateKey)}</span>
+        <span>ETA {stop.arrive}</span>
+        <span>ข้อมูล {sampleTime}</span>
+      </div>
+      <span className={styles.stopWeatherLocation}>
+        {stop.name} · {stop.place}
+      </span>
+    </div>
+  );
+}
+
 function StopRow({
   stop,
   index,
   forecast,
   forecastStatus,
+  forecastDate,
 }: {
   stop: TimedStop;
   index: number;
   forecast: ForecastWeather | null;
   forecastStatus: ForecastStatus;
+  forecastDate: string;
 }) {
   return (
     <li className={styles.stop}>
@@ -259,15 +307,8 @@ function StopRow({
         <h3 className={styles.stopName}>{stop.name}</h3>
         <p className={styles.stopPlace}>{stop.place}</p>
         <p className={styles.stopRole}>{stop.role}</p>
-        <StopWeather status={forecastStatus} forecast={forecast} />
+        <StopWeather status={forecastStatus} forecast={forecast} dateKey={forecastDate} stop={stop} />
         <p className={styles.stopNote}>{stop.note}</p>
-
-        {stop.food ? (
-          <p className={styles.stopFood}>
-            <span className={styles.foodTag}>กินนิ่ม</span>
-            {stop.food}
-          </p>
-        ) : null}
 
         <div className={styles.stopFoot}>
           <span className={cx(styles.tag, styles.tagRest)}>พัก {stop.restLabel}</span>
@@ -289,6 +330,29 @@ function StopRow({
   );
 }
 
+function TimelineDayHeader({
+  day,
+  dateKey,
+  route,
+  meta,
+}: {
+  day: "01" | "02";
+  dateKey: string;
+  route: string;
+  meta: string;
+}) {
+  return (
+    <header className={styles.timelineDayHeader}>
+      <div>
+        <span className={styles.timelineDayIndex}>DAY {day}</span>
+        <span className={styles.timelineDayDate}>{formatThaiShortDate(dateKey)}</span>
+      </div>
+      <h3>{route}</h3>
+      <p>{meta}</p>
+    </header>
+  );
+}
+
 export function Trip01Client({ fontClassName }: { fontClassName: string }) {
   const [forecastState, setForecastState] = useState<ForecastState>(() => initialForecastState());
   const [selectedDate, setSelectedDate] = useState<string>(WEATHER_START_DATE);
@@ -302,7 +366,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
 
     // One request covers every selectable day for all stops; the picker just
     // reslices the same hourly series client-side.
-    void fetchStopsForecast(FORECAST_POINTS, WEATHER_START_DATE, WEATHER_END_DATE, controller.signal)
+    void fetchStopsForecast(FORECAST_POINTS, WEATHER_FETCH_START_DATE, WEATHER_END_DATE, controller.signal)
       .then((series) => setForecastState({ status: "ready", series }))
       .catch((error) => {
         if (isAbortError(error)) {
@@ -327,6 +391,19 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
     });
   }, [forecastState, selectedDate]);
 
+  const planCStopForecasts = useMemo(() => {
+    if (forecastState.status !== "ready") {
+      return PLAN_C_TIMED_STOPS.map(() => null);
+    }
+
+    return PLAN_C_TIMED_STOPS.map((stop, index) => {
+      const series = forecastState.series[index];
+      const forecastDate = index <= PLAN_C_OVERNIGHT_STOP_INDEX ? PLAN_C_START_DATE : PLAN_C_SECOND_DAY_DATE;
+
+      return series ? pickForecastAtHour(series, stop.arrive, forecastDate) : null;
+    });
+  }, [forecastState]);
+
   return (
     <main className={cx(styles.tripRoot, fontClassName)}>
       <div className={styles.tripPage}>
@@ -341,8 +418,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           </h1>
 
           <p className={styles.heroLead}>
-            แผนขี่วันเดียวแบบมือถืออ่านง่าย โทนสว่างสำหรับเปิดกลางวัน — เน้นจุดเติม PTT, เวลาพัก,
-            งบประมาณ และเช็กลิสต์สำคัญก่อนออก
+            roadbook 2 วันแบบมือถืออ่านง่าย โทนสว่างสำหรับเปิดกลางวัน — ออกเที่ยงวันที่ 12 นอนท่าแซะ
+            แล้วเข้ากรุงเทพฯ บ่ายวันที่ 13 เน้นจุดเติม PTT เวลาพัก งบประมาณ และเช็กลิสต์สำคัญก่อนออก
           </p>
 
           <dl className={styles.cluster}>
@@ -354,18 +431,20 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             </div>
             <div className={styles.clusterCell}>
               <dt>ออกตัว</dt>
-              <dd>04:00</dd>
-            </div>
-            <div className={styles.clusterCell}>
-              <dt>ถึงโดยประมาณ</dt>
               <dd>
-                18:40 <span>–20:00</span>
+                12:00 <span>12 ก.ค.</span>
               </dd>
             </div>
             <div className={styles.clusterCell}>
-              <dt>งบแนะนำ</dt>
+              <dt>ถึง กทม.</dt>
               <dd>
-                2,000 <span>–2,300฿</span>
+                13:42 <span>–15:00 · 13 ก.ค.</span>
+              </dd>
+            </div>
+            <div className={styles.clusterCell}>
+              <dt>งบรวม</dt>
+              <dd>
+                2,300 <span>–2,800฿</span>
               </dd>
             </div>
           </dl>
@@ -378,8 +457,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           />
 
           <div className={styles.heroActions}>
-            <a className={styles.primaryButton} href="#stops">
-              ไปที่ไทม์ไลน์ ↓
+            <a className={styles.primaryButton} href="#plans">
+              ดูแผนเดินทาง ↓
             </a>
             <a className={styles.liveButton} href="/trip/001/live">
               <span className={styles.liveDot} aria-hidden="true" />
@@ -394,8 +473,72 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
 
         <TripLiveStatus />
 
-        <section className={styles.block}>
-          <SectionHead index="01" eyebrow="Route rules" title="กฎ 3 ข้อของทริปนี้" />
+        <section className={styles.block} id="plans">
+          <SectionHead
+            index="01"
+            eyebrow="Trip plan"
+            title="แผน Plan C · ออกเที่ยงแล้วนอนท่าแซะ"
+            lead="เส้นทางสงขลา → กรุงเทพฯ แบ่งเป็น 2 วัน — ออก 12:00 วันที่ 12 พักคืนที่จัมโบ้ เฮาส์ ในปั๊ม ปตท. ท่าแซะ แล้วออกต่อเช้าวันที่ 13 เพื่อเข้าเมืองช่วงบ่าย"
+          />
+
+          <div className={styles.planOverview}>
+            <article className={cx(styles.planCard, styles.planCardAfternoon)} aria-labelledby="plan-afternoon-title">
+              <div className={styles.planCardHead}>
+                <span className={styles.planTag}>Plan C · 12 Jul</span>
+                <span className={cx(styles.planBadge, styles.planBadgeAfternoon)}>ออกเที่ยง</span>
+              </div>
+              <h3 id="plan-afternoon-title" className={styles.planTitle}>
+                ออกวันที่ 12 แล้วพักจัมโบ้ เฮาส์ ท่าแซะ
+              </h3>
+              <p className={styles.planIntro}>
+                เริ่มเดินทางเวลา 12:00 ถึงปตท. บ้านเขาพาง/ท่าแซะราว 18:55 แล้วขี่ต่ออีกประมาณ 22 กม.
+                ถึงจัมโบ้ เฮาส์ ในปั๊ม ปตท. ท่าแซะ ราว 19:10 — ช่วงท้ายมืดแล้ว ขี่ด้วยความระวัง
+              </p>
+
+              <dl className={styles.planStats}>
+                <div>
+                  <dt>วันแรก</dt>
+                  <dd>~516 กม.</dd>
+                </div>
+                <div>
+                  <dt>วันที่สอง</dt>
+                  <dd>~484 กม.</dd>
+                </div>
+                <div>
+                  <dt>เข้า กทม.</dt>
+                  <dd>บ่ายต้น</dd>
+                </div>
+              </dl>
+
+              <ol className={styles.planDays}>
+                <li>
+                  <span className={styles.planDayNo}>12 ก.ค.</span>
+                  <div>
+                    <strong>สงขลา → จัมโบ้ เฮาส์ ท่าแซะ</strong>
+                    <span>12:00–ประมาณ 19:10 · ปั๊มบ้านเขาพางถึงโรงแรม ~22 กม.</span>
+                  </div>
+                </li>
+                <li>
+                  <span className={styles.planDayNo}>13 ก.ค.</span>
+                  <div>
+                    <strong>ท่าแซะ → รามคำแหง</strong>
+                    <span>06:30–13:42 โดยประมาณ · เผื่อรถเข้าเมืองถึง 15:00</span>
+                  </div>
+                </li>
+              </ol>
+
+              <p className={styles.planCost}>
+                จัมโบ้ เฮาส์ · ในปั๊ม ปตท. ท่าแซะ (มี KFC · Café Amazon · 7-Eleven) · 130/3 ม.2 ต.ทรัพย์อนันต์ ·
+                เช็กอินได้ 24 ชม. · ~500–600฿ (Agoda 8.0/10)
+              </p>
+              <p className={styles.planSafeStop}>
+                ช่วงบ้านเขาพาง→โรงแรมเป็นการขี่หลังมืด ~15 นาที ถ้าฝนตกหรือล้ามากให้จบวันแถวหลังสวนแทน ·
+                วันที่ 13 แนะนำ 06:30 เฉพาะเมื่อเรดาร์เปิดทาง หากชุมพรยังมีฝนหนักให้รอ ไม่ควรยึดเวลาแล้วฝืนออก
+              </p>
+            </article>
+          </div>
+
+          <h3 className={styles.rulesTitle}>กฎเดินทางของทริปนี้</h3>
           <div className={styles.ruleGrid}>
             {principles.map(([title, text], i) => (
               <article key={title} className={styles.rule}>
@@ -405,60 +548,21 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               </article>
             ))}
           </div>
-
-          <div className={styles.planGrid}>
-            <article className={styles.planCard}>
-              <span className={styles.planTag}>แผน A · วันเดียว</span>
-              <p>
-                ออก 04:00 → ถึง PTT รามคำแหงราว <strong>18:40</strong> ถ้าพักตามแผนและถนนไม่ติดหนัก
-              </p>
-            </article>
-            <article className={cx(styles.planCard, styles.planCardWarn)}>
-              <span className={styles.planTag}>แผน B · ค้างคืน (ปลอดภัยกว่า)</span>
-              <p>
-                ถ้าล้า ให้ค้างทับสะแก/กุยบุรี/หัวหิน (มาถึงช่วงบ่าย) แล้วเข้ากรุงเทพฯ วันถัดไป เหลือ ~300 กม.
-                — เติมที่สมุทรสาครก่อนเข้าเมืองเสมอ
-              </p>
-              <p className={styles.planBail}>
-                หลุดแผนเกิน 60–90 นาทีตั้งแต่ก่อนถึงชุมพร → เปลี่ยนเป็นค้างคืนทันที
-              </p>
-            </article>
-          </div>
-        </section>
-
-        <section className={styles.block} id="stops">
-          <SectionHead
-            index="02"
-            eyebrow="PTT stops"
-            title="ไทม์ไลน์จุดเติม + พัก"
-            lead="ระยะและ ETA คำนวณจากเวลาออก 04:00, ระยะระหว่าง waypoint และสปีดขี่จริงต่อช่วงทาง — ตัวเลขทุกค่าอัปเดตตาม waypoint ปัจจุบัน"
-          />
-          <ol className={styles.timeline}>
-            {TIMED_STOPS.map((stop, index) => (
-              <StopRow
-                key={stop.name}
-                stop={stop}
-                index={index}
-                forecast={stopForecasts[index] ?? null}
-                forecastStatus={forecastState.status}
-              />
-            ))}
-          </ol>
         </section>
 
         <section className={styles.block} id="budget">
           <SectionHead
-            index="03"
+            index="02"
             eyebrow="Trip budget"
-            title="งบน้ำมัน + 7‑Eleven"
+            title="งบน้ำมัน + 7‑Eleven + ที่พัก"
             lead="คำนวณจากระยะผ่าน waypoint ~1,000 กม. โดยเริ่มนับ 0 กม. ที่ PTT ม่วงงาม และสมมติฐาน R15v3 วิ่งจริง 35–45 กม./ลิตร"
           />
           <div className={styles.budgetWrap}>
             <article className={styles.budgetHero}>
               <p className={styles.budgetLabel}>พกอย่างน้อย</p>
-              <p className={styles.budgetFigure}>2,000–2,300฿</p>
+              <p className={styles.budgetFigure}>2,300–2,800฿</p>
               <p className={styles.budgetSub}>
-                Gasohol 95 แบบมี buffer + อาหาร/น้ำ 7‑Eleven ทั้งวัน + เงินเผื่อฉุกเฉิน · ยังไม่รวมค่าที่พักถ้าค้างคืน
+                Gasohol 95 แบบมี buffer + อาหาร/น้ำ 7‑Eleven ทั้งวัน + ที่พักท่าแซะ 1 คืน + เงินเผื่อฉุกเฉิน
               </p>
               <dl className={styles.budgetList}>
                 {budgetItems.map(([label, value]) => (
@@ -495,7 +599,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
 
         <section className={styles.block} id="checklist">
           <SectionHead
-            index="04"
+            index="03"
             eyebrow="R15v3 prep"
             title="เช็กลิสต์ก่อนออก"
             lead="เลือกชนิดน้ำมันตามคู่มือ/สติกเกอร์ฝาถัง ถ้าไม่แน่ใจให้เลือก Gasohol 95 และเลี่ยงการทดลองน้ำมันใหม่กลางทริป"
@@ -511,14 +615,76 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           </div>
         </section>
 
+        <section className={styles.block} id="stops">
+          <SectionHead
+            index="04"
+            eyebrow="PTT stops"
+            title="ไทม์ไลน์จุดเติม + พัก"
+            lead="ไทม์ไลน์จุดเติม PTT และเวลาพักของ Plan C — วันแรกออก 12:00 ถึงจัมโบ้ เฮาส์ ท่าแซะ ช่วงค่ำ พักคืน แล้วออกต่อ 06:30 เช้าวันที่ 13 เข้ากรุงเทพฯ บ่าย"
+          />
+
+          <div>
+            <TimelineDayHeader
+              day="01"
+              dateKey={PLAN_C_START_DATE}
+              route="สงขลา → จัมโบ้ เฮาส์ ท่าแซะ"
+              meta="ออก 12:00 · ถึงประมาณ 19:10 · ระยะวันแรก ~516 กม."
+            />
+            <ol className={styles.timeline}>
+              {PLAN_C_TIMELINE.dayOne.map((stop, index) => (
+                <StopRow
+                  key={`afternoon-one-${stop.name}`}
+                  stop={stop}
+                  index={index}
+                  forecast={planCStopForecasts[index] ?? null}
+                  forecastStatus={forecastState.status}
+                  forecastDate={PLAN_C_START_DATE}
+                />
+              ))}
+            </ol>
+
+            <div className={styles.overnightDivider} role="note">
+              <span>พักคืนวันที่ 12</span>
+              <strong>จัมโบ้ เฮาส์ · ในปั๊ม ปตท. ท่าแซะ ห่างจากปั๊มบ้านเขาพาง ~22 กม. / 15 นาที</strong>
+              <p>130/3 ม.2 ต.ทรัพย์อนันต์ อ.ท่าแซะ · เช็กอินได้ 24 ชม. · ในปั๊มมี KFC · Café Amazon · 7-Eleven</p>
+              <a href={mapsLink(PLAN_C_HOTEL_COORDS)} target="_blank" rel="noreferrer" className={styles.overnightMapLink}>
+                เปิดพิกัดโรงแรม ↗
+              </a>
+            </div>
+
+            <TimelineDayHeader
+              day="02"
+              dateKey={PLAN_C_SECOND_DAY_DATE}
+              route="ท่าแซะ → รามคำแหง"
+              meta="แนะนำออก 06:30 เมื่อเรดาร์เปิด · ถึง 13:42–15:00 · ระยะวันที่สอง ~484 กม."
+            />
+            <ol className={cx(styles.timeline, styles.timelineDayTwo)}>
+              {PLAN_C_TIMELINE.dayTwo.map((stop, dayIndex) => {
+                const stopIndex = PLAN_C_TIMELINE.dayOne.length + dayIndex;
+
+                return (
+                  <StopRow
+                    key={`afternoon-two-${stop.name}`}
+                    stop={stop}
+                    index={stopIndex}
+                    forecast={planCStopForecasts[stopIndex] ?? null}
+                    forecastStatus={forecastState.status}
+                    forecastDate={PLAN_C_SECOND_DAY_DATE}
+                  />
+                );
+              })}
+            </ol>
+          </div>
+        </section>
+
         <footer className={styles.footer}>
           <p className={styles.footerNote}>
-            ใช้แผนนี้เป็น roadbook ส่วนตัว ไม่ใช่คำสั่งให้ฝืนขี่วันเดียว — ถ้าเริ่มง่วง ตาล้า ปวดข้อมือ
-            หรือฝนหนัก ให้เปลี่ยนเป็นแผนค้างคืนทันที
+            ใช้เป็น roadbook ส่วนตัว ไม่ใช่คำสั่งให้ยึดเวลาเป๊ะ — ถ้าเริ่มง่วง ตาล้า ปวดข้อมือ
+            หรือฝนหนัก ให้พักหรือเลื่อนเวลาออกทันที
           </p>
           <p className={styles.footerMeta}>
-            ETA: ออก 04:00 · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม. · ขี่รวม ~11ชม.35น.
-            + พัก ~3ชม.05น.
+            ETA: ออก 12:00 (12 ก.ค.) · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · นอนจัมโบ้ เฮาส์ ท่าแซะ · ออกต่อ 06:30 (13 ก.ค.) ·
+            ถึงรามคำแหง 13:42–15:00 · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม.
           </p>
         </footer>
       </div>
@@ -636,6 +802,76 @@ function weatherToneClass(tone: WeatherTone): string {
   }
 }
 
+function buildSplitTimeline(
+  allStops: readonly TimedStop[],
+  options: {
+    overnightStopIndex: number;
+    firstDayStartMinutes: number;
+    secondDayStartMinutes: number;
+    secondDayFirstLegMinutes?: number;
+    overnightRole?: string;
+    overnightNote?: string;
+  }
+): {
+  dayOne: TimedStop[];
+  dayTwo: TimedStop[];
+} {
+  let firstDayClock = options.firstDayStartMinutes;
+  const dayOne = allStops.slice(0, options.overnightStopIndex + 1).map((stop, index) => {
+    const arriveMinutes = firstDayClock + stop.rideMin;
+    const isOvernightStop = index === options.overnightStopIndex;
+    const depart = isOvernightStop
+      ? `${toHHMM(options.secondDayStartMinutes)} วันถัดไป`
+      : toHHMM(arriveMinutes + stop.restMin);
+
+    firstDayClock = arriveMinutes + stop.restMin;
+
+    return {
+      ...stop,
+      arrive: toHHMM(arriveMinutes),
+      arriveMinutes,
+      depart,
+      restLabel: isOvernightStop ? "ค้างคืน" : stop.restMin ? `${stop.restMin} นาที` : "ไม่พักต่อ",
+      role: isOvernightStop ? (options.overnightRole ?? "จบทริปวันแรก / พักค้างคืน") : stop.role,
+      note: isOvernightStop
+        ? (options.overnightNote ??
+          "เช็กอิน พักร่างกายและรถให้เต็มคืน ก่อนตรวจโซ่ ลมยาง น้ำมัน และอากาศอีกครั้งตอนเช้า")
+        : stop.note,
+      tags: isOvernightStop ? ["พักค้างคืน", "พักรถ"] : stop.tags,
+    };
+  });
+
+  let clock = options.secondDayStartMinutes;
+  const dayTwo = allStops.slice(options.overnightStopIndex + 1).map((stop, index) => {
+    const rideMin = index === 0 ? (options.secondDayFirstLegMinutes ?? stop.rideMin) : stop.rideMin;
+    const arriveMinutes = clock + rideMin;
+    const depart = stop.restMin ? toHHMM(arriveMinutes + stop.restMin) : "จบทริป";
+
+    clock = arriveMinutes + stop.restMin;
+
+    return {
+      ...stop,
+      rideMin,
+      arrive: toHHMM(arriveMinutes),
+      arriveMinutes,
+      depart,
+      restLabel: stop.restMin ? `${stop.restMin} นาที` : "ไม่พักต่อ",
+    };
+  });
+
+  return { dayOne, dayTwo };
+}
+
+function shiftDateKey(value: string, days: number): string | null {
+  const dateMs = dateKeyToUtcMs(value);
+
+  if (dateMs === null) {
+    return null;
+  }
+
+  return new Date(dateMs + days * DAY_MS).toISOString().slice(0, 10);
+}
+
 function isForecastDateInRange(now: Date, dateKey: string): boolean {
   const todayMs = dateKeyToUtcMs(bangkokDateKey(now));
   const forecastMs = dateKeyToUtcMs(dateKey);
@@ -651,7 +887,7 @@ function isForecastDateInRange(now: Date, dateKey: string): boolean {
 
 // Worth fetching as long as any selectable day still falls in the forecast window.
 function isForecastRangeInRange(now: Date): boolean {
-  return WEATHER_FORECAST_DATES.some((dateKey) => isForecastDateInRange(now, dateKey));
+  return [PLAN_C_START_DATE, ...WEATHER_FORECAST_DATES].some((dateKey) => isForecastDateInRange(now, dateKey));
 }
 
 function initialForecastState(): ForecastState {

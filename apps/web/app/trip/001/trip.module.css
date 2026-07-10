@@ -618,6 +618,16 @@
 
 /* ---------------- Rules ---------------- */
 
+.rulesTitle {
+  margin: 24px 0 12px;
+  color: var(--ink);
+  font-family: var(--trip-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .ruleGrid {
   display: grid;
   gap: 12px;
@@ -660,25 +670,41 @@
   font-size: 0.95rem;
 }
 
-/* ---------------- Plan A / B ---------------- */
+/* ---------------- Plan overview (Plan C) ---------------- */
 
-.planGrid {
+.planOverview {
   display: grid;
   gap: 12px;
-  margin-top: 14px;
+  max-width: 680px;
 }
 
 .planCard {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 14px;
+  border-top: 4px solid var(--accent);
+  border-radius: 18px;
   background: var(--card);
-  padding: 16px 18px;
-  box-shadow: var(--shadow-soft);
+  padding: 18px;
+  box-shadow: var(--shadow);
 }
 
-.planCardWarn {
-  background: var(--card-2);
-  border-color: var(--line-strong);
+.planCardAfternoon {
+  border-color: #d5c39d;
+  border-top-color: #a26722;
+  background:
+    linear-gradient(145deg, rgba(245, 226, 184, 0.7), transparent 52%),
+    var(--card);
+}
+
+.planCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .planTag {
@@ -691,25 +717,287 @@
   color: var(--accent-deep);
 }
 
-.planCardWarn .planTag {
-  color: var(--ink);
+.planCardAfternoon .planTag {
+  color: #7a4a14;
 }
 
-.planCard p {
+.planBadge {
+  border: 1px solid #eec3b0;
+  border-radius: 999px;
+  background: var(--accent-tint);
+  padding: 3px 9px;
+  color: var(--accent-deep);
+  font-family: var(--trip-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.planBadgeAfternoon {
+  border-color: #ddc38d;
+  background: #f6e8c9;
+  color: #7a4a14;
+}
+
+.planTitle {
+  margin: 14px 0 0;
+  color: var(--ink);
+  font-size: 1.34rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.planIntro {
   margin: 9px 0 0;
-  font-size: 0.96rem;
+  font-size: 0.92rem;
   color: var(--ink-soft);
 }
 
-.planBail {
+.planStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin: 17px 0 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--line-strong);
+}
+
+.planStats div {
+  min-width: 0;
+  background: rgba(251, 246, 236, 0.94);
+  padding: 10px 8px;
+}
+
+.planStats dt {
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.3;
+}
+
+.planStats dd {
+  overflow-wrap: anywhere;
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-family: var(--trip-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.planDays {
+  display: grid;
+  gap: 9px;
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.planDays li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
   border-top: 1px dashed var(--line-strong);
-  margin-top: 12px !important;
   padding-top: 11px;
+}
+
+.planDays li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.planDayNo {
+  border-radius: 5px;
+  background: var(--ink);
+  padding: 3px 6px;
+  color: var(--card);
+  font-family: var(--trip-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.planCardAfternoon .planDayNo {
+  background: #8c581c;
+}
+
+.planDays strong,
+.planDays span {
+  display: block;
+}
+
+.planDays strong {
+  color: var(--ink);
+  font-size: 0.91rem;
+  line-height: 1.4;
+}
+
+.planDays div > span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.79rem;
+  line-height: 1.48;
+}
+
+.planCost {
+  margin: auto 0 0;
+  padding-top: 16px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
   font-weight: 600;
-  color: var(--danger) !important;
+}
+
+.planSafeStop {
+  margin: 12px 0 0;
+  border: 1px solid #bfd5b9;
+  border-radius: 11px;
+  background: rgba(230, 240, 224, 0.78);
+  padding: 10px 11px;
+  color: #2c4a32;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.52;
 }
 
 /* ---------------- Timeline ---------------- */
+
+.timelineDayHeader {
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 15px;
+  background:
+    linear-gradient(115deg, rgba(207, 69, 28, 0.11), transparent 44%),
+    var(--card);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-soft);
+}
+
+.timelineDayHeader::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--accent);
+}
+
+.timelineDayHeader > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.timelineDayIndex,
+.timelineDayDate {
+  font-family: var(--trip-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+
+.timelineDayIndex {
+  color: var(--accent-deep);
+}
+
+.timelineDayDate {
+  color: var(--muted);
+}
+
+.timelineDayHeader h3 {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 1.18rem;
+  line-height: 1.25;
+}
+
+.timelineDayHeader p {
+  margin: 4px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.overnightDivider {
+  position: relative;
+  margin: 4px 0 22px;
+  border: 1px solid #bfd5b9;
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(230, 240, 224, 0.96), rgba(251, 246, 236, 0.92));
+  padding: 15px 16px 15px 48px;
+  box-shadow: var(--shadow-soft);
+}
+
+.overnightDivider::before {
+  content: "☾";
+  position: absolute;
+  left: 15px;
+  top: 16px;
+  color: var(--rest);
+  font-family: var(--trip-mono);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.overnightDivider span,
+.overnightDivider strong {
+  display: block;
+}
+
+.overnightDivider span {
+  color: var(--rest);
+  font-family: var(--trip-mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.overnightDivider strong {
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.4;
+}
+
+.overnightDivider p {
+  margin: 5px 0 0;
+  color: #46614c;
+  font-size: 0.82rem;
+  line-height: 1.52;
+}
+
+.overnightMapLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  margin-top: 10px;
+  border: 1px solid #a9c5a2;
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.78);
+  padding: 6px 11px;
+  color: var(--rest);
+  font-family: var(--trip-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.overnightMapLink:hover {
+  border-color: var(--rest);
+  background: var(--card);
+}
 
 .timeline {
   list-style: none;
@@ -769,6 +1057,11 @@
 }
 
 .stop:last-child .node {
+  background: var(--rest);
+  box-shadow: 0 8px 18px -10px rgba(47, 107, 65, 0.7);
+}
+
+.timelineDayTwo .stop:first-child .node {
   background: var(--rest);
   box-shadow: 0 8px 18px -10px rgba(47, 107, 65, 0.7);
 }
@@ -933,6 +1226,43 @@
   line-height: 1.5;
 }
 
+.stopWeatherContext {
+  grid-column: 1 / -1;
+  min-width: 0;
+  border-top: 1px dashed var(--weather-border);
+  padding-top: 8px;
+}
+
+.stopWeatherContextMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.stopWeatherContextMeta span {
+  border: 1px solid var(--weather-border);
+  border-radius: 999px;
+  background: rgba(251, 246, 236, 0.82);
+  padding: 2px 7px;
+  color: var(--ink);
+  font-family: var(--trip-mono);
+  font-size: 0.67rem;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.stopWeatherLocation {
+  display: block;
+  overflow: hidden;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stopWeatherMetrics {
   grid-column: 1 / -1;
   display: flex;
@@ -986,32 +1316,6 @@
   margin: 5px 0 0;
   font-size: 0.94rem;
   color: var(--ink-soft);
-}
-
-.stopFood {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px;
-  margin: 12px 0 0;
-  border-radius: 11px;
-  background: var(--rest-tint);
-  border: 1px solid #cfe1c4;
-  padding: 9px 11px;
-  font-size: 0.88rem;
-  color: #2c4a32;
-}
-
-.foodTag {
-  font-family: var(--trip-mono);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #fff;
-  background: var(--rest);
-  border-radius: 5px;
-  padding: 2px 7px;
 }
 
 .stopFoot {
@@ -1339,11 +1643,6 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .planGrid {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
-
   .budgetWrap {
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
     align-items: start;
@@ -1376,6 +1675,7 @@
   .primaryButton,
   .ghostButton,
   .mapLink,
+  .overnightMapLink,
   .check,
   .checkBox,
   .checkBox::after {
