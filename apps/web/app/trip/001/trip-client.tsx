@@ -21,8 +21,8 @@ import styles from "./trip.module.css";
 
 const principles = [
   [
-    "ยึดจังหวะ ออกเที่ยง–นอนท่าแซะ",
-    "ออก 12:00 วันที่ 12 จากสงขลา นอนจัมโบ้ เฮาส์ ในปั๊ม ปตท. ท่าแซะ แล้วออกต่อ 06:30 เช้าวันที่ 13",
+    "ยึดจังหวะ ออกเที่ยง–นอนหลังสวน",
+    "ออก 12:00 วันที่ 12 จากสงขลา นอนโรงแรมหลังสวนเพลส (อ.หลังสวน) แล้วออกต่อ 05:00 เช้าวันที่ 13",
   ],
   [
     "เติมทุกครั้งที่พัก",
@@ -37,7 +37,7 @@ const principles = [
 const budgetItems = [
   ["น้ำมัน Gasohol 95 (40 กม./ลิตร + เผื่อ 10%)", "≈1,060฿"],
   ["อาหาร/น้ำ 7‑Eleven แบบกินนิ่มทั้งวัน", "≈450–650฿"],
-  ["ที่พักจัมโบ้ เฮาส์ ท่าแซะ 1 คืน", "≈500–600฿"],
+  ["ที่พักหลังสวนเพลส 1 คืน", "≈500–600฿"],
   ["เงินเผื่อฉุกเฉินเล็กน้อย", "≈300–500฿"],
 ] as const;
 
@@ -68,17 +68,17 @@ function mapsLink([lat, lon]: [number, number]) {
 const TIMED_STOPS = buildTimedStops();
 const PLAN_C_START_DATE = "2026-07-12";
 const PLAN_C_SECOND_DAY_DATE = "2026-07-13";
-const PLAN_C_OVERNIGHT_STOP_INDEX = 4;
-const PLAN_C_SECOND_DAY_START_MINUTES = 6 * 60 + 30;
-const PLAN_C_HOTEL_COORDS: [number, number] = [10.6952981, 99.2053037];
+const PLAN_C_OVERNIGHT_STOP_INDEX = 3;
+const PLAN_C_SECOND_DAY_START_MINUTES = 5 * 60;
+const PLAN_C_HOTEL_COORDS: [number, number] = [9.9633216, 99.0684246];
 const PLAN_C_TIMELINE = buildSplitTimeline(TIMED_STOPS, {
   overnightStopIndex: PLAN_C_OVERNIGHT_STOP_INDEX,
   firstDayStartMinutes: 12 * 60,
   secondDayStartMinutes: PLAN_C_SECOND_DAY_START_MINUTES,
-  secondDayFirstLegMinutes: 80,
-  overnightRole: "จบทริปวันแรก / ไปโรงแรมจัมโบ้ เฮาส์ ท่าแซะ",
+  secondDayFirstLegMinutes: 48,
+  overnightRole: "จบทริปวันแรก / ไปโรงแรมหลังสวนเพลส",
   overnightNote:
-    "แวะหรือขี่ผ่านก็ได้ จากปั๊มนี้ขี่ต่ออีกประมาณ 22 กม. / 15 นาทีถึงจัมโบ้ เฮาส์ ซึ่งอยู่ในปั๊ม ปตท. ท่าแซะ — ช่วงท้ายฟ้ามืดแล้ว เปิดไฟและลดความเร็ว",
+    "จบวันแรกที่ปั๊มจิงโจ้ หลังสวน แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาทีถึงโรงแรมหลังสวนเพลส เช็กอิน พักเต็มคืน ก่อนออกเช้าวันที่ 13",
 });
 const PLAN_C_TIMED_STOPS = [...PLAN_C_TIMELINE.dayOne, ...PLAN_C_TIMELINE.dayTwo];
 const FORECAST_POINTS = TIMED_STOPS.map((stop) => ({
@@ -418,8 +418,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           </h1>
 
           <p className={styles.heroLead}>
-            roadbook 2 วันแบบมือถืออ่านง่าย โทนสว่างสำหรับเปิดกลางวัน — ออกเที่ยงวันที่ 12 นอนท่าแซะ
-            แล้วเข้ากรุงเทพฯ บ่ายวันที่ 13 เน้นจุดเติม PTT เวลาพัก งบประมาณ และเช็กลิสต์สำคัญก่อนออก
+            roadbook 2 วันแบบมือถืออ่านง่าย โทนสว่างสำหรับเปิดกลางวัน — ออกเที่ยงวันที่ 12 นอนหลังสวน
+            แล้วเข้ากรุงเทพฯ บ่ายต้นวันที่ 13 เน้นจุดเติม PTT เวลาพัก งบประมาณ และเช็กลิสต์สำคัญก่อนออก
           </p>
 
           <dl className={styles.cluster}>
@@ -438,7 +438,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <div className={styles.clusterCell}>
               <dt>ถึง กทม.</dt>
               <dd>
-                13:42 <span>–15:00 · 13 ก.ค.</span>
+                13:33 <span>–14:45 · 13 ก.ค.</span>
               </dd>
             </div>
             <div className={styles.clusterCell}>
@@ -477,8 +477,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           <SectionHead
             index="01"
             eyebrow="Trip plan"
-            title="แผน Plan C · ออกเที่ยงแล้วนอนท่าแซะ"
-            lead="เส้นทางสงขลา → กรุงเทพฯ แบ่งเป็น 2 วัน — ออก 12:00 วันที่ 12 พักคืนที่จัมโบ้ เฮาส์ ในปั๊ม ปตท. ท่าแซะ แล้วออกต่อเช้าวันที่ 13 เพื่อเข้าเมืองช่วงบ่าย"
+            title="แผน Plan C · ออกเที่ยงแล้วนอนหลังสวน"
+            lead="เส้นทางสงขลา → กรุงเทพฯ แบ่งเป็น 2 วัน — ออก 12:00 วันที่ 12 พักคืนที่โรงแรมหลังสวนเพลส (อ.หลังสวน) แล้วออกต่อเช้าวันที่ 13 เพื่อเข้าเมืองช่วงบ่ายต้น"
           />
 
           <div className={styles.planOverview}>
@@ -488,21 +488,21 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
                 <span className={cx(styles.planBadge, styles.planBadgeAfternoon)}>ออกเที่ยง</span>
               </div>
               <h3 id="plan-afternoon-title" className={styles.planTitle}>
-                ออกวันที่ 12 แล้วพักจัมโบ้ เฮาส์ ท่าแซะ
+                ออกวันที่ 12 แล้วพักหลังสวนเพลส
               </h3>
               <p className={styles.planIntro}>
-                เริ่มเดินทางเวลา 12:00 ถึงปตท. บ้านเขาพาง/ท่าแซะราว 18:55 แล้วขี่ต่ออีกประมาณ 22 กม.
-                ถึงจัมโบ้ เฮาส์ ในปั๊ม ปตท. ท่าแซะ ราว 19:10 — ช่วงท้ายมืดแล้ว ขี่ด้วยความระวัง
+                เริ่มเดินทางเวลา 12:00 ถึงปตท. จิงโจ้ หลังสวนราว 17:43 แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาที
+                ถึงโรงแรมหลังสวนเพลส ราว 17:48 — ถึงก่อนค่ำ พักเต็มคืน แล้วค่อยออกเช้าวันที่ 13
               </p>
 
               <dl className={styles.planStats}>
                 <div>
                   <dt>วันแรก</dt>
-                  <dd>~516 กม.</dd>
+                  <dd>~422 กม.</dd>
                 </div>
                 <div>
                   <dt>วันที่สอง</dt>
-                  <dd>~484 กม.</dd>
+                  <dd>~578 กม.</dd>
                 </div>
                 <div>
                   <dt>เข้า กทม.</dt>
@@ -514,26 +514,28 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
                 <li>
                   <span className={styles.planDayNo}>12 ก.ค.</span>
                   <div>
-                    <strong>สงขลา → จัมโบ้ เฮาส์ ท่าแซะ</strong>
-                    <span>12:00–ประมาณ 19:10 · ปั๊มบ้านเขาพางถึงโรงแรม ~22 กม.</span>
+                    <strong>สงขลา → หลังสวนเพลส</strong>
+                    <span>12:00–ประมาณ 17:48 · ปั๊มจิงโจ้ถึงโรงแรม ~6.1 กม.</span>
                   </div>
                 </li>
                 <li>
                   <span className={styles.planDayNo}>13 ก.ค.</span>
                   <div>
-                    <strong>ท่าแซะ → รามคำแหง</strong>
-                    <span>06:30–13:42 โดยประมาณ · เผื่อรถเข้าเมืองถึง 15:00</span>
+                    <strong>หลังสวน → รามคำแหง</strong>
+                    <span>05:00–13:33 โดยประมาณ · เผื่อรถเข้าเมืองถึง 14:45</span>
                   </div>
                 </li>
               </ol>
 
               <p className={styles.planCost}>
-                จัมโบ้ เฮาส์ · ในปั๊ม ปตท. ท่าแซะ (มี KFC · Café Amazon · 7-Eleven) · 130/3 ม.2 ต.ทรัพย์อนันต์ ·
-                เช็กอินได้ 24 ชม. · ~500–600฿ (Agoda 8.0/10)
+                โรงแรมหลังสวนเพลส · 40/4 ต.วังตะกอ อ.หลังสวน ชุมพร 86110 · โทร 082‑183‑8365 ·
+                โรงแรม 2 ดาว ห้องแอร์ + WiFi ฟรี · โทรจองล่วงหน้าได้
               </p>
               <p className={styles.planSafeStop}>
-                ช่วงบ้านเขาพาง→โรงแรมเป็นการขี่หลังมืด ~15 นาที ถ้าฝนตกหรือล้ามากให้จบวันแถวหลังสวนแทน ·
-                วันที่ 13 แนะนำ 06:30 เฉพาะเมื่อเรดาร์เปิดทาง หากชุมพรยังมีฝนหนักให้รอ ไม่ควรยึดเวลาแล้วฝืนออก
+                วันที่ 13 พยากรณ์ฝนฟ้าคะนองช่วงบ่ายแถบเข้า กทม. จึงแนะนำออก 05:00 ให้ถึงรามคำแหงก่อน 15:00
+                (เผื่อรถติด +45–90 นาที ยิ่งออกเช้ายิ่งกันพลาด) · ช่วงแรก ~1 ชม. ยังมืด–สลัว ใช้ไฟหน้า+แว่นใส
+                และช่วงใต้ฝนหนักทั้งวัน ใส่ชุดกันฝนตั้งแต่ออก · เช็กเรดาร์ก่อนออก ถ้ามีฟ้าผ่าที่หลังสวนให้รอ
+                และถ้าเจอพายุตั้งเค้าช่วงเพชรบุรี–พระราม 2 ให้หลบเข้าปั๊มรอก่อน อย่าฝ่าฟ้าผ่าเข้าเมือง
               </p>
             </article>
           </div>
@@ -562,7 +564,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               <p className={styles.budgetLabel}>พกอย่างน้อย</p>
               <p className={styles.budgetFigure}>2,300–2,800฿</p>
               <p className={styles.budgetSub}>
-                Gasohol 95 แบบมี buffer + อาหาร/น้ำ 7‑Eleven ทั้งวัน + ที่พักท่าแซะ 1 คืน + เงินเผื่อฉุกเฉิน
+                Gasohol 95 แบบมี buffer + อาหาร/น้ำ 7‑Eleven ทั้งวัน + ที่พักหลังสวน 1 คืน + เงินเผื่อฉุกเฉิน
               </p>
               <dl className={styles.budgetList}>
                 {budgetItems.map(([label, value]) => (
@@ -620,15 +622,15 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             index="04"
             eyebrow="PTT stops"
             title="ไทม์ไลน์จุดเติม + พัก"
-            lead="ไทม์ไลน์จุดเติม PTT และเวลาพักของ Plan C — วันแรกออก 12:00 ถึงจัมโบ้ เฮาส์ ท่าแซะ ช่วงค่ำ พักคืน แล้วออกต่อ 06:30 เช้าวันที่ 13 เข้ากรุงเทพฯ บ่าย"
+            lead="ไทม์ไลน์จุดเติม PTT และเวลาพักของ Plan C — วันแรกออก 12:00 ถึงโรงแรมหลังสวนเพลส ช่วงเย็น พักคืน แล้วออกต่อ 05:00 เช้าวันที่ 13 (เลี่ยงพายุบ่ายตอนเข้า กทม.) ถึงกรุงเทพฯ ช่วงบ่ายต้น"
           />
 
           <div>
             <TimelineDayHeader
               day="01"
               dateKey={PLAN_C_START_DATE}
-              route="สงขลา → จัมโบ้ เฮาส์ ท่าแซะ"
-              meta="ออก 12:00 · ถึงประมาณ 19:10 · ระยะวันแรก ~516 กม."
+              route="สงขลา → โรงแรมหลังสวนเพลส"
+              meta="ออก 12:00 · ถึงประมาณ 17:48 · ระยะวันแรก ~422 กม."
             />
             <ol className={styles.timeline}>
               {PLAN_C_TIMELINE.dayOne.map((stop, index) => (
@@ -645,8 +647,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
 
             <div className={styles.overnightDivider} role="note">
               <span>พักคืนวันที่ 12</span>
-              <strong>จัมโบ้ เฮาส์ · ในปั๊ม ปตท. ท่าแซะ ห่างจากปั๊มบ้านเขาพาง ~22 กม. / 15 นาที</strong>
-              <p>130/3 ม.2 ต.ทรัพย์อนันต์ อ.ท่าแซะ · เช็กอินได้ 24 ชม. · ในปั๊มมี KFC · Café Amazon · 7-Eleven</p>
+              <strong>โรงแรมหลังสวนเพลส · ห่างจากปั๊มจิงโจ้ หลังสวน ~6.1 กม. / 5 นาที</strong>
+              <p>40/4 ต.วังตะกอ อ.หลังสวน ชุมพร 86110 · โทร 082‑183‑8365 · โรงแรม 2 ดาว ห้องแอร์ + WiFi ฟรี</p>
               <a href={mapsLink(PLAN_C_HOTEL_COORDS)} target="_blank" rel="noreferrer" className={styles.overnightMapLink}>
                 เปิดพิกัดโรงแรม ↗
               </a>
@@ -655,8 +657,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <TimelineDayHeader
               day="02"
               dateKey={PLAN_C_SECOND_DAY_DATE}
-              route="ท่าแซะ → รามคำแหง"
-              meta="แนะนำออก 06:30 เมื่อเรดาร์เปิด · ถึง 13:42–15:00 · ระยะวันที่สอง ~484 กม."
+              route="หลังสวน → รามคำแหง"
+              meta="แนะนำออก 05:00 เลี่ยงพายุบ่าย · ถึง 13:33–14:45 · ระยะวันที่สอง ~578 กม."
             />
             <ol className={cx(styles.timeline, styles.timelineDayTwo)}>
               {PLAN_C_TIMELINE.dayTwo.map((stop, dayIndex) => {
@@ -683,8 +685,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             หรือฝนหนัก ให้พักหรือเลื่อนเวลาออกทันที
           </p>
           <p className={styles.footerMeta}>
-            ETA: ออก 12:00 (12 ก.ค.) · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · นอนจัมโบ้ เฮาส์ ท่าแซะ · ออกต่อ 06:30 (13 ก.ค.) ·
-            ถึงรามคำแหง 13:42–15:00 · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม.
+            ETA: ออก 12:00 (12 ก.ค.) · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · นอนโรงแรมหลังสวนเพลส · ออกต่อ 05:00 (13 ก.ค.) ·
+            ถึงรามคำแหง 13:33–14:45 · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม.
           </p>
         </footer>
       </div>
