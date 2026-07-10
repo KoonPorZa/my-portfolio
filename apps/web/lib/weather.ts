@@ -202,6 +202,19 @@ export function pickForecastAtHour(
   };
 }
 
+export function forecastSampleTime(hhmm: string): string | null {
+  const minutes = roundHHMMToHourMinutes(hhmm);
+
+  if (minutes === null) {
+    return null;
+  }
+
+  const hours = String(Math.floor(minutes / 60)).padStart(2, "0");
+  const remainder = String(minutes % 60).padStart(2, "0");
+
+  return `${hours}:${remainder}`;
+}
+
 export function describeWeather(code: number): WeatherDescription {
   if (code === 0) {
     return { label: "ท้องฟ้าโปร่ง", icon: "☀️", tone: "clear" };
