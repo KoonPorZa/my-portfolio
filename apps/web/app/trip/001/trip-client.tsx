@@ -12,7 +12,6 @@ import {
   pickForecastAtHour,
   type ForecastWeather,
   type HourlySeries,
-  type WeatherDescription,
   type WeatherTone,
 } from "@/lib/weather";
 import { buildTimedStops, duration, type TimedStop } from "@/lib/trip-stops";
@@ -129,51 +128,6 @@ function SectionHead({
       <h2>{title}</h2>
       {lead ? <p className={styles.lead}>{lead}</p> : null}
     </header>
-  );
-}
-
-function RouteWeatherSummary({
-  state,
-  forecasts,
-  selectedDate,
-  onSelectDate,
-}: {
-  state: ForecastState;
-  forecasts: Array<ForecastWeather | null>;
-  selectedDate: string;
-  onSelectDate: (date: string) => void;
-}) {
-  const dateLabel = formatThaiShortDate(selectedDate);
-  const summary = summarizeRouteWeather(state, forecasts, dateLabel);
-
-  return (
-    <section className={cx(styles.weatherSummary, summary.tone ? weatherToneClass(summary.tone) : null)} aria-live="polite">
-      <div className={styles.weatherSummaryTop}>
-        <span className={styles.weatherSummaryLabel}>สภาพอากาศทริป</span>
-        <span className={styles.weatherSummaryDate}>{dateLabel}</span>
-      </div>
-      <p className={styles.weatherSummaryTitle}>{summary.title}</p>
-      <p className={styles.weatherSummaryMeta}>{summary.meta}</p>
-
-      <div className={styles.weatherDates} role="group" aria-label="เลือกวันพยากรณ์อากาศ">
-        <span className={styles.weatherDatesLabel}>เลือกวัน</span>
-        {WEATHER_FORECAST_DATES.map((dateKey) => {
-          const active = dateKey === selectedDate;
-
-          return (
-            <button
-              key={dateKey}
-              type="button"
-              className={cx(styles.weatherDate, active ? styles.weatherDateActive : null)}
-              aria-pressed={active}
-              onClick={() => onSelectDate(dateKey)}
-            >
-              {formatThaiShortDate(dateKey)}
-            </button>
-          );
-        })}
-      </div>
-    </section>
   );
 }
 
@@ -349,7 +303,6 @@ function TimelineDayHeader({
 
 export function Trip01Client({ fontClassName }: { fontClassName: string }) {
   const [forecastState, setForecastState] = useState<ForecastState>(() => initialForecastState());
-  const [selectedDate, setSelectedDate] = useState<string>(WEATHER_START_DATE);
 
   useEffect(() => {
     if (!isForecastRangeInRange(new Date())) {
@@ -372,18 +325,6 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
 
     return () => controller.abort();
   }, []);
-
-  const stopForecasts = useMemo(() => {
-    if (forecastState.status !== "ready") {
-      return TIMED_STOPS.map(() => null);
-    }
-
-    return TIMED_STOPS.map((stop, index) => {
-      const series = forecastState.series[index];
-
-      return series ? pickForecastAtHour(series, stop.arrive, selectedDate) : null;
-    });
-  }, [forecastState, selectedDate]);
 
   const planCStopForecasts = useMemo(() => {
     if (forecastState.status !== "ready") {
@@ -442,13 +383,6 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               </dd>
             </div>
           </dl>
-
-          <RouteWeatherSummary
-            state={forecastState}
-            forecasts={stopForecasts}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
 
           <div className={styles.heroActions}>
             <a className={styles.primaryButton} href="#plans">
@@ -686,101 +620,6 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
       </div>
     </main>
   );
-}
-
-function summarizeRouteWeather(
-  state: ForecastState,
-  forecasts: Array<ForecastWeather | null>,
-  dateLabel: string
-): { title: string; meta: string; tone: WeatherTone | null } {
-  if (state.status === "loading") {
-    return {
-      title: `${dateLabel} · กำลังโหลดพยากรณ์ตามเวลาถึง`,
-      meta: "เรียก Open-Meteo หนึ่งครั้งสำหรับ 10 จุดพัก",
-      tone: null,
-    };
-  }
-
-  if (state.status === "error") {
-    return {
-      title: `${dateLabel} · เปิดพยากรณ์ไม่ได้ตอนนี้`,
-      meta: "ข้ามข้อมูลอากาศไว้ก่อน แผนจุดพักยังใช้ได้ตามเดิม",
-      tone: null,
-    };
-  }
-
-  if (state.status === "out-of-range") {
-    return {
-      title: `${dateLabel} · ยังไม่มีข้อมูลพยากรณ์`,
-      meta: "ยังไม่มีข้อมูลพยากรณ์ / ใกล้วันเดินทางจะแม่นขึ้น",
-      tone: null,
-    };
-  }
-
-  const dominant = dominantWeather(forecasts);
-  const rainiest = rainiestStop(forecasts);
-
-  if (!dominant || !rainiest) {
-    return {
-      title: `${dateLabel} · ยังไม่มีข้อมูลชั่วโมงเวลาถึง`,
-      meta: "Open-Meteo ตอบกลับแล้ว แต่ข้อมูลรายชั่วโมงไม่ครบสำหรับจุดพัก",
-      tone: null,
-    };
-  }
-
-  return {
-    title: `${dateLabel} · ส่วนใหญ่ ${dominant.label}`,
-    meta: `ฝนสูงสุด ${Math.round(rainiest.forecast.precipProb)}% แถว ${rainiest.stop.name}`,
-    tone: dominant.tone,
-  };
-}
-
-function dominantWeather(forecasts: Array<ForecastWeather | null>): WeatherDescription | null {
-  const counts = new Map<string, { description: WeatherDescription; count: number }>();
-
-  for (const forecast of forecasts) {
-    if (!forecast) {
-      continue;
-    }
-
-    const description = describeWeather(forecast.code);
-    const existing = counts.get(description.label);
-
-    if (existing) {
-      existing.count += 1;
-    } else {
-      counts.set(description.label, { description, count: 1 });
-    }
-  }
-
-  let best: { description: WeatherDescription; count: number } | null = null;
-
-  for (const entry of counts.values()) {
-    if (!best || entry.count > best.count) {
-      best = entry;
-    }
-  }
-
-  return best?.description ?? null;
-}
-
-function rainiestStop(forecasts: Array<ForecastWeather | null>): { stop: TimedStop; forecast: ForecastWeather } | null {
-  let rainiest: { stop: TimedStop; forecast: ForecastWeather } | null = null;
-
-  for (let index = 0; index < forecasts.length; index += 1) {
-    const forecast = forecasts[index];
-    const stop = TIMED_STOPS[index];
-
-    if (!forecast || !stop) {
-      continue;
-    }
-
-    if (!rainiest || forecast.precipProb > rainiest.forecast.precipProb) {
-      rainiest = { stop, forecast };
-    }
-  }
-
-  return rainiest;
 }
 
 function weatherToneClass(tone: WeatherTone): string {
