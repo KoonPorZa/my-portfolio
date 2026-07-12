@@ -15,14 +15,23 @@ import {
   type WeatherDescription,
   type WeatherTone,
 } from "@/lib/weather";
-import { buildTimedStops, duration, toHHMM, type TimedStop } from "@/lib/trip-stops";
+import { buildTimedStops, duration, type TimedStop } from "@/lib/trip-stops";
+import {
+  PLAN_C_DAY_ONE,
+  PLAN_C_DAY_TWO,
+  PLAN_C_HOTEL_COORDS,
+  PLAN_C_OVERNIGHT_STOP_INDEX,
+  PLAN_C_SECOND_DAY_DATE,
+  PLAN_C_START_DATE,
+  PLAN_C_TIMED_STOPS,
+} from "@/lib/trip-plan";
 import { TripLiveStatus } from "./live-status";
 import styles from "./trip.module.css";
 
 const principles = [
   [
-    "ยึดจังหวะ ออกเที่ยง–นอนหลังสวน",
-    "ออก 12:00 วันที่ 12 จากสงขลา นอนโรงแรมหลังสวนเพลส (อ.หลังสวน) แล้วออกต่อ 05:00 เช้าวันที่ 13",
+    "ยึดจังหวะ ออกบ่าย–นอนหลังสวน",
+    "ออก 13:30 วันที่ 12 จากสงขลา นอนโรงแรมหลังสวนเพลส (อ.หลังสวน) แล้วออกต่อ 05:00 เช้าวันที่ 13",
   ],
   [
     "เติมทุกครั้งที่พัก",
@@ -36,7 +45,7 @@ const principles = [
 
 const budgetItems = [
   ["น้ำมัน Gasohol 95 (40 กม./ลิตร + เผื่อ 10%)", "≈1,060฿"],
-  ["อาหาร/น้ำ 7‑Eleven แบบกินนิ่มทั้งวัน", "≈450–650฿"],
+  ["อาหาร/น้ำ 7‑Eleven แบบกินนิ่มตลอด 2 วัน", "≈450–650฿"],
   ["ที่พักหลังสวนเพลส 1 คืน", "≈500–600฿"],
   ["เงินเผื่อฉุกเฉินเล็กน้อย", "≈300–500฿"],
 ] as const;
@@ -66,21 +75,6 @@ function mapsLink([lat, lon]: [number, number]) {
 }
 
 const TIMED_STOPS = buildTimedStops();
-const PLAN_C_START_DATE = "2026-07-12";
-const PLAN_C_SECOND_DAY_DATE = "2026-07-13";
-const PLAN_C_OVERNIGHT_STOP_INDEX = 3;
-const PLAN_C_SECOND_DAY_START_MINUTES = 5 * 60;
-const PLAN_C_HOTEL_COORDS: [number, number] = [9.9633216, 99.0684246];
-const PLAN_C_TIMELINE = buildSplitTimeline(TIMED_STOPS, {
-  overnightStopIndex: PLAN_C_OVERNIGHT_STOP_INDEX,
-  firstDayStartMinutes: 12 * 60,
-  secondDayStartMinutes: PLAN_C_SECOND_DAY_START_MINUTES,
-  secondDayFirstLegMinutes: 48,
-  overnightRole: "จบทริปวันแรก / ไปโรงแรมหลังสวนเพลส",
-  overnightNote:
-    "จบวันแรกที่ปั๊มจิงโจ้ หลังสวน แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาทีถึงโรงแรมหลังสวนเพลส เช็กอิน พักเต็มคืน ก่อนออกเช้าวันที่ 13",
-});
-const PLAN_C_TIMED_STOPS = [...PLAN_C_TIMELINE.dayOne, ...PLAN_C_TIMELINE.dayTwo];
 const FORECAST_POINTS = TIMED_STOPS.map((stop) => ({
   lat: stop.coords[0],
   lon: stop.coords[1],
@@ -92,7 +86,7 @@ const LAST_DEPARTURE_DATE = WEATHER_FORECAST_DATES[WEATHER_FORECAST_DATES.length
 const WEATHER_END_DATE = shiftDateKey(LAST_DEPARTURE_DATE, 1) ?? LAST_DEPARTURE_DATE;
 
 const TAG_ACCENT = new Set(["Start", "เติมเต็มถัง", "สำคัญ", "ก่อนเข้าเมือง", "Finish"]);
-const TAG_REST = new Set(["Day run", "พักคน", "พักรถ", "พักสั้น", "พักค้างคืน", "Breakfast", "Lunch"]);
+const TAG_REST = new Set(["Day run", "พักคน", "พักรถ", "พักสั้น", "พักค้างคืน", "Breakfast", "Lunch", "Dinner"]);
 const TAG_DANGER = new Set(["Decision"]);
 
 type ForecastState =
@@ -418,7 +412,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           </h1>
 
           <p className={styles.heroLead}>
-            roadbook 2 วันแบบมือถืออ่านง่าย โทนสว่างสำหรับเปิดกลางวัน — ออกเที่ยงวันที่ 12 นอนหลังสวน
+            roadbook 2 วันแบบมือถืออ่านง่าย โทนสว่างสำหรับเปิดกลางวัน — ออกบ่ายวันที่ 12 นอนหลังสวน
             แล้วเข้ากรุงเทพฯ บ่ายต้นวันที่ 13 เน้นจุดเติม PTT เวลาพัก งบประมาณ และเช็กลิสต์สำคัญก่อนออก
           </p>
 
@@ -432,7 +426,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             <div className={styles.clusterCell}>
               <dt>ออกตัว</dt>
               <dd>
-                12:00 <span>12 ก.ค.</span>
+                13:30 <span>12 ก.ค.</span>
               </dd>
             </div>
             <div className={styles.clusterCell}>
@@ -477,22 +471,22 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
           <SectionHead
             index="01"
             eyebrow="Trip plan"
-            title="แผน Plan C · ออกเที่ยงแล้วนอนหลังสวน"
-            lead="เส้นทางสงขลา → กรุงเทพฯ แบ่งเป็น 2 วัน — ออก 12:00 วันที่ 12 พักคืนที่โรงแรมหลังสวนเพลส (อ.หลังสวน) แล้วออกต่อเช้าวันที่ 13 เพื่อเข้าเมืองช่วงบ่ายต้น"
+            title="แผน Plan C · ออกบ่ายแล้วนอนหลังสวน"
+            lead="เส้นทางสงขลา → กรุงเทพฯ แบ่งเป็น 2 วัน — ออก 13:30 วันที่ 12 พักคืนที่โรงแรมหลังสวนเพลส (อ.หลังสวน) แล้วออกต่อเช้าวันที่ 13 เพื่อเข้าเมืองช่วงบ่ายต้น"
           />
 
           <div className={styles.planOverview}>
             <article className={cx(styles.planCard, styles.planCardAfternoon)} aria-labelledby="plan-afternoon-title">
               <div className={styles.planCardHead}>
                 <span className={styles.planTag}>Plan C · 12 Jul</span>
-                <span className={cx(styles.planBadge, styles.planBadgeAfternoon)}>ออกเที่ยง</span>
+                <span className={cx(styles.planBadge, styles.planBadgeAfternoon)}>ออกบ่าย</span>
               </div>
               <h3 id="plan-afternoon-title" className={styles.planTitle}>
                 ออกวันที่ 12 แล้วพักหลังสวนเพลส
               </h3>
               <p className={styles.planIntro}>
-                เริ่มเดินทางเวลา 12:00 ถึงปตท. จิงโจ้ หลังสวนราว 17:43 แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาที
-                ถึงโรงแรมหลังสวนเพลส ราว 17:48 — ถึงก่อนค่ำ พักเต็มคืน แล้วค่อยออกเช้าวันที่ 13
+                เริ่มเดินทางเวลา 13:30 ถึงปตท. จิงโจ้ หลังสวนราว 19:13 แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาที
+                ถึงโรงแรมหลังสวนเพลส ราว 19:18 — ช่วงท้ายเริ่มมืด เปิดไฟขี่ระวัง แล้วพักเต็มคืนก่อนออกเช้าวันที่ 13
               </p>
 
               <dl className={styles.planStats}>
@@ -515,7 +509,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
                   <span className={styles.planDayNo}>12 ก.ค.</span>
                   <div>
                     <strong>สงขลา → หลังสวนเพลส</strong>
-                    <span>12:00–ประมาณ 17:48 · ปั๊มจิงโจ้ถึงโรงแรม ~6.1 กม.</span>
+                    <span>13:30–ประมาณ 19:18 · ปั๊มจิงโจ้ถึงโรงแรม ~6.1 กม.</span>
                   </div>
                 </li>
                 <li>
@@ -564,7 +558,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               <p className={styles.budgetLabel}>พกอย่างน้อย</p>
               <p className={styles.budgetFigure}>2,300–2,800฿</p>
               <p className={styles.budgetSub}>
-                Gasohol 95 แบบมี buffer + อาหาร/น้ำ 7‑Eleven ทั้งวัน + ที่พักหลังสวน 1 คืน + เงินเผื่อฉุกเฉิน
+                Gasohol 95 แบบมี buffer + อาหาร/น้ำ 7‑Eleven ตลอด 2 วัน + ที่พักหลังสวน 1 คืน + เงินเผื่อฉุกเฉิน
               </p>
               <dl className={styles.budgetList}>
                 {budgetItems.map(([label, value]) => (
@@ -622,7 +616,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             index="04"
             eyebrow="PTT stops"
             title="ไทม์ไลน์จุดเติม + พัก"
-            lead="ไทม์ไลน์จุดเติม PTT และเวลาพักของ Plan C — วันแรกออก 12:00 ถึงโรงแรมหลังสวนเพลส ช่วงเย็น พักคืน แล้วออกต่อ 05:00 เช้าวันที่ 13 (เลี่ยงพายุบ่ายตอนเข้า กทม.) ถึงกรุงเทพฯ ช่วงบ่ายต้น"
+            lead="ไทม์ไลน์จุดเติม PTT และเวลาพักของ Plan C — วันแรกออก 13:30 ถึงโรงแรมหลังสวนเพลส ช่วงค่ำ พักคืน แล้วออกต่อ 05:00 เช้าวันที่ 13 (เลี่ยงพายุบ่ายตอนเข้า กทม.) ถึงกรุงเทพฯ ช่วงบ่ายต้น"
           />
 
           <div>
@@ -630,10 +624,10 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               day="01"
               dateKey={PLAN_C_START_DATE}
               route="สงขลา → โรงแรมหลังสวนเพลส"
-              meta="ออก 12:00 · ถึงประมาณ 17:48 · ระยะวันแรก ~422 กม."
+              meta="ออก 13:30 · ถึงประมาณ 19:18 · ระยะวันแรก ~422 กม."
             />
             <ol className={styles.timeline}>
-              {PLAN_C_TIMELINE.dayOne.map((stop, index) => (
+              {PLAN_C_DAY_ONE.map((stop, index) => (
                 <StopRow
                   key={`afternoon-one-${stop.name}`}
                   stop={stop}
@@ -661,8 +655,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               meta="แนะนำออก 05:00 เลี่ยงพายุบ่าย · ถึง 13:33–14:45 · ระยะวันที่สอง ~578 กม."
             />
             <ol className={cx(styles.timeline, styles.timelineDayTwo)}>
-              {PLAN_C_TIMELINE.dayTwo.map((stop, dayIndex) => {
-                const stopIndex = PLAN_C_TIMELINE.dayOne.length + dayIndex;
+              {PLAN_C_DAY_TWO.map((stop, dayIndex) => {
+                const stopIndex = PLAN_C_DAY_ONE.length + dayIndex;
 
                 return (
                   <StopRow
@@ -685,7 +679,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
             หรือฝนหนัก ให้พักหรือเลื่อนเวลาออกทันที
           </p>
           <p className={styles.footerMeta}>
-            ETA: ออก 12:00 (12 ก.ค.) · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · นอนโรงแรมหลังสวนเพลส · ออกต่อ 05:00 (13 ก.ค.) ·
+            ETA: ออก 13:30 (12 ก.ค.) · เริ่มนับ 0 กม. ที่ PTT ม่วงงาม · นอนโรงแรมหลังสวนเพลส · ออกต่อ 05:00 (13 ก.ค.) ·
             ถึงรามคำแหง 13:33–14:45 · ทางหลัก 85–90 · สมุทรสาคร–รามคำแหง 70 กม./ชม.
           </p>
         </footer>
@@ -802,66 +796,6 @@ function weatherToneClass(tone: WeatherTone): string {
     case "fog":
       return styles.weatherToneFog;
   }
-}
-
-function buildSplitTimeline(
-  allStops: readonly TimedStop[],
-  options: {
-    overnightStopIndex: number;
-    firstDayStartMinutes: number;
-    secondDayStartMinutes: number;
-    secondDayFirstLegMinutes?: number;
-    overnightRole?: string;
-    overnightNote?: string;
-  }
-): {
-  dayOne: TimedStop[];
-  dayTwo: TimedStop[];
-} {
-  let firstDayClock = options.firstDayStartMinutes;
-  const dayOne = allStops.slice(0, options.overnightStopIndex + 1).map((stop, index) => {
-    const arriveMinutes = firstDayClock + stop.rideMin;
-    const isOvernightStop = index === options.overnightStopIndex;
-    const depart = isOvernightStop
-      ? `${toHHMM(options.secondDayStartMinutes)} วันถัดไป`
-      : toHHMM(arriveMinutes + stop.restMin);
-
-    firstDayClock = arriveMinutes + stop.restMin;
-
-    return {
-      ...stop,
-      arrive: toHHMM(arriveMinutes),
-      arriveMinutes,
-      depart,
-      restLabel: isOvernightStop ? "ค้างคืน" : stop.restMin ? `${stop.restMin} นาที` : "ไม่พักต่อ",
-      role: isOvernightStop ? (options.overnightRole ?? "จบทริปวันแรก / พักค้างคืน") : stop.role,
-      note: isOvernightStop
-        ? (options.overnightNote ??
-          "เช็กอิน พักร่างกายและรถให้เต็มคืน ก่อนตรวจโซ่ ลมยาง น้ำมัน และอากาศอีกครั้งตอนเช้า")
-        : stop.note,
-      tags: isOvernightStop ? ["พักค้างคืน", "พักรถ"] : stop.tags,
-    };
-  });
-
-  let clock = options.secondDayStartMinutes;
-  const dayTwo = allStops.slice(options.overnightStopIndex + 1).map((stop, index) => {
-    const rideMin = index === 0 ? (options.secondDayFirstLegMinutes ?? stop.rideMin) : stop.rideMin;
-    const arriveMinutes = clock + rideMin;
-    const depart = stop.restMin ? toHHMM(arriveMinutes + stop.restMin) : "จบทริป";
-
-    clock = arriveMinutes + stop.restMin;
-
-    return {
-      ...stop,
-      rideMin,
-      arrive: toHHMM(arriveMinutes),
-      arriveMinutes,
-      depart,
-      restLabel: stop.restMin ? `${stop.restMin} นาที` : "ไม่พักต่อ",
-    };
-  });
-
-  return { dayOne, dayTwo };
 }
 
 function shiftDateKey(value: string, days: number): string | null {

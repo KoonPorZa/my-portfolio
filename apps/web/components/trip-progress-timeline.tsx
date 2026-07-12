@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 
 import type { StopArrival } from "@/lib/trip-gps/types";
-import { buildTimedStops, TRIP_STOP_COUNT } from "@/lib/trip-stops";
+import { PLAN_C_TIMED_STOPS } from "@/lib/trip-plan";
+import { TRIP_STOP_COUNT } from "@/lib/trip-stops";
 import styles from "./trip-progress-timeline.module.css";
 
 type DeltaTone = "rest" | "accent" | "danger" | "muted";
@@ -36,7 +37,10 @@ type BangkokParts = {
   minute: number;
 };
 
-const TIMED_STOPS = buildTimedStops();
+// The planned "แผน" times come from the shared Plan C itinerary so /live and
+// /share always match the /trip/001 roadbook (day 1 depart 13:30, overnight at
+// หลังสวนเพลส, day 2 depart 05:00). Was buildTimedStops() = the old 04:00 plan.
+const TIMED_STOPS = PLAN_C_TIMED_STOPS;
 const BANGKOK_OFFSET_HOURS = 7;
 const BANGKOK_PARTS_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Bangkok",
