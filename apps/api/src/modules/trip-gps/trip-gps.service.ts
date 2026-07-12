@@ -54,12 +54,15 @@ const EARTH_RADIUS_M = 6_371_000;
 const DEGREES_TO_RADIANS = Math.PI / 180;
 const TRACK_POINT_LIMIT = 1500;
 
-// Keep this order in sync with the stops array in apps/web/app/trip/001/trip-client.tsx.
+// Keep this order in sync with the `stops` array in apps/web/lib/trip-stops.ts.
+// Index 4 is the overnight hotel (โรงแรมหลังสวนเพลส) — arrivals are keyed by this
+// index in trip_stop_arrivals, so never reorder existing entries; only append.
 export const TRIP_001_STOP_COORDS: [number, number][] = [
   [7.2061568, 100.5547474],
   [8.3378608, 99.9256754],
   [9.14055, 99.3647639],
   [9.9137335, 99.0604903],
+  [9.9633216, 99.0684246],
   [10.5692017, 99.116111],
   [11.527931, 99.6206976],
   [12.1025771, 99.8530734],

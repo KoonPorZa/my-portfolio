@@ -419,8 +419,8 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
                 ออกวันที่ 12 แล้วพักหลังสวนเพลส
               </h3>
               <p className={styles.planIntro}>
-                เริ่มเดินทางเวลา 13:30 ถึงปตท. จิงโจ้ หลังสวนราว 19:13 แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาที
-                ถึงโรงแรมหลังสวนเพลส ราว 19:18 — ช่วงท้ายเริ่มมืด เปิดไฟขี่ระวัง แล้วพักเต็มคืนก่อนออกเช้าวันที่ 13
+                เริ่มเดินทางเวลา 13:30 ถึงปตท. จิงโจ้ หลังสวนราว 19:13 เติมน้ำมัน/พัก 20 นาที แล้วขี่ต่ออีก ~6.1 กม. / 5 นาที
+                ถึงโรงแรมหลังสวนเพลส ราว 19:38 — ช่วงท้ายเริ่มมืด เปิดไฟขี่ระวัง แล้วพักเต็มคืนก่อนออกเช้าวันที่ 13
               </p>
 
               <dl className={styles.planStats}>
@@ -443,7 +443,7 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
                   <span className={styles.planDayNo}>12 ก.ค.</span>
                   <div>
                     <strong>สงขลา → หลังสวนเพลส</strong>
-                    <span>13:30–ประมาณ 19:18 · ปั๊มจิงโจ้ถึงโรงแรม ~6.1 กม.</span>
+                    <span>13:30–ประมาณ 19:38 · ปั๊มจิงโจ้ถึงโรงแรม ~6.1 กม.</span>
                   </div>
                 </li>
                 <li>
@@ -558,10 +558,12 @@ export function Trip01Client({ fontClassName }: { fontClassName: string }) {
               day="01"
               dateKey={PLAN_C_START_DATE}
               route="สงขลา → โรงแรมหลังสวนเพลส"
-              meta="ออก 13:30 · ถึงประมาณ 19:18 · ระยะวันแรก ~422 กม."
+              meta="ออก 13:30 · ถึงประมาณ 19:38 · ระยะวันแรก ~422 กม."
             />
             <ol className={styles.timeline}>
-              {PLAN_C_DAY_ONE.map((stop, index) => (
+              {/* Last day-1 stop is the overnight hotel; the overnightDivider below
+                  renders it with full address/phone/map, so drop it from the cards. */}
+              {PLAN_C_DAY_ONE.slice(0, -1).map((stop, index) => (
                 <StopRow
                   key={`afternoon-one-${stop.name}`}
                   stop={stop}
