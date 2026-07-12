@@ -6,7 +6,7 @@ import { buildTimedStops, toHHMM, type TimedStop } from "./trip-stops";
 
 export const PLAN_C_START_DATE = "2026-07-12";
 export const PLAN_C_SECOND_DAY_DATE = "2026-07-13";
-export const PLAN_C_OVERNIGHT_STOP_INDEX = 3;
+export const PLAN_C_OVERNIGHT_STOP_INDEX = 4;
 export const PLAN_C_SECOND_DAY_START_MINUTES = 5 * 60;
 export const PLAN_C_HOTEL_COORDS: [number, number] = [9.9633216, 99.0684246];
 
@@ -74,10 +74,9 @@ const PLAN_C_TIMELINE = buildSplitTimeline(buildTimedStops(), {
   overnightStopIndex: PLAN_C_OVERNIGHT_STOP_INDEX,
   firstDayStartMinutes: 13 * 60 + 30,
   secondDayStartMinutes: PLAN_C_SECOND_DAY_START_MINUTES,
-  secondDayFirstLegMinutes: 48,
-  overnightRole: "จบทริปวันแรก / ไปโรงแรมหลังสวนเพลส",
+  overnightRole: "ค้างคืน โรงแรมหลังสวนเพลส",
   overnightNote:
-    "จบวันแรกที่ปั๊มจิงโจ้ หลังสวน แล้วขี่ต่ออีกประมาณ 6.1 กม. / 5 นาทีถึงโรงแรมหลังสวนเพลส เช็กอิน พักเต็มคืน ก่อนออกเช้าวันที่ 13",
+    "จบวันแรกที่โรงแรมหลังสวนเพลส (ห่างจากปั๊มจิงโจ้ หลังสวน ~6.1 กม. / 5 นาที) เช็กอิน พักเต็มคืน ก่อนออกเช้าวันที่ 13",
 });
 
 export const PLAN_C_DAY_ONE = PLAN_C_TIMELINE.dayOne;

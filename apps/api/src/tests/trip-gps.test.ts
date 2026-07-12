@@ -169,7 +169,7 @@ describe("Trip GPS Fastify routes", () => {
     ]);
     expect(body.stopArrivals).toEqual([
       {
-        index: 8,
+        index: 9,
         arrivedAt: new Date(BASE_NOW).toISOString(),
         source: "auto",
       },
