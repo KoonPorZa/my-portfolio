@@ -214,7 +214,7 @@ export function TripProgressTimeline({
                         </button>
                       </>
                     ) : (
-                      <p className={styles.controlHint}>เริ่มแชร์ GPS แล้วค่อยแก้เวลาถึงจริง</p>
+                      <p className={styles.controlHint}>เริ่มแชร์ GPS หรือกด “กรอกเวลาเอง” ก่อน แล้วค่อยแก้เวลาถึงจริง</p>
                     )}
                   </div>
                 ) : null}

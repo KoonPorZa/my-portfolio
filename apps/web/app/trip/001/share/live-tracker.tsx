@@ -259,6 +259,83 @@ function resolveViewerLink(viewerLink: string): string {
   return new URL(viewerLink, window.location.origin).toString();
 }
 
+// Persist the one trip session locally so a page reload or a dropped connection
+// reuses it instead of minting a fresh session every time (this trip is single-use;
+// one session for the whole ride). Only the owner's own device stores this.
+const SESSION_STORAGE_KEY = "trip-001-share-session";
+
+type PersistedSession = {
+  sessionId: string;
+  ownerToken: string;
+  viewerToken: string;
+  viewerLink: string;
+  expiresAt: string | null;
+};
+
+function loadPersistedSession(): PersistedSession | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<PersistedSession>;
+
+    if (
+      typeof parsed?.sessionId !== "string" ||
+      typeof parsed?.ownerToken !== "string" ||
+      typeof parsed?.viewerToken !== "string" ||
+      typeof parsed?.viewerLink !== "string"
+    ) {
+      return null;
+    }
+
+    // Drop an already-expired session so we don't try to write to a dead one.
+    if (typeof parsed.expiresAt === "string" && Date.parse(parsed.expiresAt) <= Date.now()) {
+      return null;
+    }
+
+    return {
+      sessionId: parsed.sessionId,
+      ownerToken: parsed.ownerToken,
+      viewerToken: parsed.viewerToken,
+      viewerLink: parsed.viewerLink,
+      expiresAt: typeof parsed.expiresAt === "string" ? parsed.expiresAt : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function savePersistedSession(session: PersistedSession): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+  } catch {
+    // Ignore private-mode / quota errors — persistence is best-effort.
+  }
+}
+
+function clearPersistedSession(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // Ignore.
+  }
+}
+
 async function createLiveSession(code: string): Promise<CreateSessionResponse> {
   const response = await fetch(apiEndpoint(SESSION_START_ENDPOINT_PATH), {
     method: "POST",
@@ -515,7 +592,10 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       }
 
       setSecureContext(window.isSecureContext);
-      setViewerLink(buildViewerLink(window.location.origin));
+      // Don't clobber a viewer link already restored from a persisted session.
+      if (!viewerTokenRef.current) {
+        setViewerLink(buildViewerLink(window.location.origin));
+      }
       setIsHidden(document.hidden);
     });
 
@@ -622,6 +702,32 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       setProgressError(error instanceof Error ? error.message : "โหลดความคืบหน้าทริปไม่สำเร็จ");
     }
   }, []);
+
+  // On load, reuse the persisted trip session (page reload / dropped connection)
+  // instead of forcing a new one, and re-enable manual time editing right away.
+  useEffect(() => {
+    const persisted = loadPersistedSession();
+
+    if (!persisted) {
+      return;
+    }
+
+    // Refs first (synchronous) so the mount effect above skips resetting the link.
+    ownerTokenRef.current = persisted.ownerToken;
+    viewerTokenRef.current = persisted.viewerToken;
+    sessionIdRef.current = persisted.sessionId;
+
+    // Defer the state writes into a frame (matching the mount effect) so we don't
+    // trip react-hooks/set-state-in-effect with a synchronous render cascade.
+    const frameId = window.requestAnimationFrame(() => {
+      setViewerLink(persisted.viewerLink);
+      setSessionExpiresAt(persisted.expiresAt);
+      setProgressControlsActive(true);
+      void refreshProgressFromViewer(persisted.viewerToken);
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [refreshProgressFromViewer]);
 
   const applyProgressUpdate = useCallback(async (input: ProgressUpdateInput) => {
     const ownerToken = ownerTokenRef.current;
@@ -775,9 +881,19 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       return;
     }
 
+    // If a session is already active (manual mode or restored after a reload),
+    // promote THAT one to GPS instead of minting a new session — otherwise its
+    // already-recorded arrivals get stranded under the old session id.
+    const existingOwnerToken = ownerTokenRef.current;
+    const existingSessionId = sessionIdRef.current;
+    const existingViewerToken = viewerTokenRef.current;
+    const reuseSession = Boolean(
+      progressControlsActive && existingOwnerToken && existingSessionId && existingViewerToken
+    );
+
     const code = ownerCode.trim();
 
-    if (!code) {
+    if (!reuseSession && !code) {
       setLastError("ใส่โค้ดแชร์สดก่อนเริ่ม");
       return;
     }
@@ -786,36 +902,67 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     setLastError(null);
     setProgressMessage(null);
     setProgressError(null);
-    setStopArrivals([]);
     setProgressControlsActive(false);
     setNextSendAt(null);
     setConsecutiveUploadFailures(0);
     setWasHiddenWhileSharing(false);
     setUploadStatus("idle");
 
+    if (!reuseSession) {
+      // Only wipe the timeline for a brand-new session; a reused one keeps its arrivals.
+      setStopArrivals([]);
+    }
+
     try {
-      const session = await createLiveSession(code);
+      let ownerToken: string;
+      let sessionId: string;
+      let viewerToken: string;
 
-      ownerTokenRef.current = session.ownerToken;
-      viewerTokenRef.current = session.viewerToken;
-      sessionIdRef.current = session.session.id;
-      seqRef.current = 0;
-      setViewerLink(resolveViewerLink(session.viewerLink));
-      setSessionExpiresAt(session.session.expiresAt);
-      setOwnerCode("");
+      if (reuseSession) {
+        // Same session id + tokens — the persisted copy stays valid, no re-save needed.
+        ownerToken = existingOwnerToken as string;
+        sessionId = existingSessionId as string;
+        viewerToken = existingViewerToken as string;
+      } else {
+        const session = await createLiveSession(code);
 
-      const captured = await captureAndUpload("start", session.session.id, modeRef.current);
+        ownerToken = session.ownerToken;
+        sessionId = session.session.id;
+        viewerToken = session.viewerToken;
+        ownerTokenRef.current = ownerToken;
+        viewerTokenRef.current = viewerToken;
+        sessionIdRef.current = sessionId;
+        seqRef.current = 0;
+        setViewerLink(resolveViewerLink(session.viewerLink));
+        setSessionExpiresAt(session.session.expiresAt);
+        setOwnerCode("");
+        savePersistedSession({
+          sessionId,
+          ownerToken,
+          viewerToken,
+          viewerLink: resolveViewerLink(session.viewerLink),
+          expiresAt: session.session.expiresAt,
+        });
+      }
+
+      const captured = await captureAndUpload("start", sessionId, modeRef.current);
 
       if (!captured) {
-        await stopLiveSession(session.ownerToken, session.session.id, "revoke").catch(() => undefined);
-        ownerTokenRef.current = null;
-        viewerTokenRef.current = null;
-        sessionIdRef.current = null;
-        setSessionExpiresAt(null);
-        setProgressControlsActive(false);
-        setViewerLink(
-          typeof window === "undefined" ? "/trip/001/live" : buildViewerLink(window.location.origin)
-        );
+        if (reuseSession) {
+          // Keep the existing session (and its arrivals) editable via manual mode.
+          setProgressControlsActive(true);
+        } else {
+          await stopLiveSession(ownerToken, sessionId, "revoke").catch(() => undefined);
+          clearPersistedSession();
+          ownerTokenRef.current = null;
+          viewerTokenRef.current = null;
+          sessionIdRef.current = null;
+          setSessionExpiresAt(null);
+          setProgressControlsActive(false);
+          setViewerLink(
+            typeof window === "undefined" ? "/trip/001/live" : buildViewerLink(window.location.origin)
+          );
+        }
         return;
       }
 
@@ -823,19 +970,106 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
       setProgressControlsActive(true);
       setNow(Date.now());
       setNextSendAt(Date.now() + intervalForMode(modeRef.current));
-      void refreshProgressFromViewer(session.viewerToken);
+      void refreshProgressFromViewer(viewerToken);
       void requestWakeLock();
     } catch (error) {
+      if (reuseSession) {
+        // Preserve the reused session so manual editing still works.
+        setProgressControlsActive(true);
+      } else {
+        clearPersistedSession();
+        ownerTokenRef.current = null;
+        viewerTokenRef.current = null;
+        sessionIdRef.current = null;
+        setSessionExpiresAt(null);
+        setProgressControlsActive(false);
+      }
+      setLastError(error instanceof Error ? error.message : "เริ่มแชร์ GPS สดไม่สำเร็จ");
+    } finally {
+      setIsStarting(false);
+    }
+  }, [
+    captureAndUpload,
+    isSharing,
+    isStarting,
+    ownerCode,
+    progressControlsActive,
+    refreshProgressFromViewer,
+    requestWakeLock,
+  ]);
+
+  // Manual mode: create/authenticate a session so the owner can record arrival
+  // times WITHOUT turning on GPS (no location capture, no wake lock, no uploads).
+  // The write path only needs a valid owner token + session, which this provides.
+  const handleStartManual = useCallback(async () => {
+    if (isSharing || isStarting || progressControlsActive) {
+      return;
+    }
+
+    const code = ownerCode.trim();
+
+    if (!code) {
+      setProgressError("ใส่โค้ดแชร์สดก่อนเริ่มกรอกเวลาเอง");
+      return;
+    }
+
+    setIsStarting(true);
+    setLastError(null);
+    setProgressMessage(null);
+    setProgressError(null);
+
+    try {
+      const session = await createLiveSession(code);
+      const resolvedLink = resolveViewerLink(session.viewerLink);
+
+      ownerTokenRef.current = session.ownerToken;
+      viewerTokenRef.current = session.viewerToken;
+      sessionIdRef.current = session.session.id;
+      seqRef.current = 0;
+      setViewerLink(resolvedLink);
+      setSessionExpiresAt(session.session.expiresAt);
+      setOwnerCode("");
+      setProgressControlsActive(true);
+      savePersistedSession({
+        sessionId: session.session.id,
+        ownerToken: session.ownerToken,
+        viewerToken: session.viewerToken,
+        viewerLink: resolvedLink,
+        expiresAt: session.session.expiresAt,
+      });
+      setProgressMessage("เข้าโหมดกรอกเวลาเองแล้ว — แตะจุดพักเพื่อบันทึกเวลาถึงได้เลย");
+      void refreshProgressFromViewer(session.viewerToken);
+    } catch (error) {
+      clearPersistedSession();
       ownerTokenRef.current = null;
       viewerTokenRef.current = null;
       sessionIdRef.current = null;
       setSessionExpiresAt(null);
       setProgressControlsActive(false);
-      setLastError(error instanceof Error ? error.message : "เริ่มแชร์ GPS สดไม่สำเร็จ");
+      setProgressError(error instanceof Error ? error.message : "เริ่มโหมดกรอกเวลาเองไม่สำเร็จ");
     } finally {
       setIsStarting(false);
     }
-  }, [captureAndUpload, isSharing, isStarting, ownerCode, refreshProgressFromViewer, requestWakeLock]);
+  }, [isSharing, isStarting, progressControlsActive, ownerCode, refreshProgressFromViewer]);
+
+  // Escape hatch: drop the local/persisted session so the owner can start fresh
+  // (e.g. if a saved session was ended server-side and manual editing is stuck).
+  // Only clears this device's copy — it does not delete any recorded arrivals.
+  const handleResetSession = useCallback(() => {
+    clearPersistedSession();
+    ownerTokenRef.current = null;
+    viewerTokenRef.current = null;
+    sessionIdRef.current = null;
+    seqRef.current = 0;
+    setProgressControlsActive(false);
+    setStopArrivals([]);
+    setSessionExpiresAt(null);
+    setProgressMessage(null);
+    setProgressError(null);
+    setViewerLink(
+      typeof window === "undefined" ? "/trip/001/live" : buildViewerLink(window.location.origin)
+    );
+  }, []);
 
   const handleManualPing = useCallback(
     async (reason: UploadReason = "manual") => {
@@ -927,6 +1161,7 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
 
     try {
       await stopLiveSession(ownerToken, sessionId, "stop");
+      clearPersistedSession();
       ownerTokenRef.current = null;
       viewerTokenRef.current = null;
       sessionIdRef.current = null;
@@ -988,7 +1223,9 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
     isSharing && (isHidden || wasHiddenWhileSharing || wakeLockStatus !== "active");
   const hasRepeatedUploadFailures =
     consecutiveUploadFailures >= REPEATED_UPLOAD_FAILURE_COUNT;
-  const canEditProgress = progressControlsActive && isSharing;
+  // Editing arrival times needs a valid session (owner token), not active GPS —
+  // progressControlsActive is true for both GPS sharing and manual/persisted sessions.
+  const canEditProgress = progressControlsActive;
 
   const statusItems = useMemo(
     () => [
@@ -1042,12 +1279,13 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
             <h2 id="live-tracker-title">แผงแชร์ GPS</h2>
           </div>
           <span className={cx(styles.liveBadge, isSharing ? styles.liveBadgeOn : styles.liveBadgeOff)}>
-            {isSharing ? "สด" : "ปิด"}
+            {isSharing ? "สด" : progressControlsActive ? "แก้เวลา" : "ปิด"}
           </span>
         </div>
 
         <p className={styles.lead}>
-          เริ่มส่งจากปุ่มนี้เท่านั้น ก่อนกดเริ่มแชร์ ระบบจะไม่อ่าน GPS และไม่อัปโหลดอะไร
+          เริ่มส่งจากปุ่มนี้เท่านั้น ก่อนกดเริ่มแชร์ ระบบจะไม่อ่าน GPS และไม่อัปโหลดอะไร · ถ้าไม่อยากเปิด GPS
+          กด “กรอกเวลาเอง” เพื่อบันทึกเวลาถึงแต่ละจุดด้วยมือได้เลย — เซสชันจะถูกจำไว้ รีเฟรชหรือเน็ตหลุดก็ใช้ต่อได้ ไม่สร้างใหม่
         </p>
 
         <div className={styles.preflight} aria-label="เช็กลิสต์ก่อนเริ่ม">
@@ -1101,6 +1339,24 @@ export function LiveTracker({ gpsEnabled }: { gpsEnabled: boolean }) {
           >
             ส่งจุดเอง
           </button>
+          <button
+            className={styles.secondaryAction}
+            type="button"
+            onClick={() => void handleStartManual()}
+            disabled={isSharing || isBusy || progressControlsActive || !canStart}
+          >
+            {isStarting ? "กำลังเริ่ม..." : "กรอกเวลาเอง (ไม่เปิด GPS)"}
+          </button>
+          {progressControlsActive && !isSharing ? (
+            <button
+              className={styles.stopAction}
+              type="button"
+              onClick={handleResetSession}
+              disabled={isBusy}
+            >
+              รีเซ็ตเซสชัน
+            </button>
+          ) : null}
         </div>
 
         <div className={styles.modeShortcuts} aria-label="ทางลัดรอบส่ง GPS">
