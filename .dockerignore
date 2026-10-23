@@ -42,3 +42,7 @@ out
 docs
 plans
 **/*.md
+
+# nested tooling dirs and local worker secrets
+**/.omc
+**/.dev.vars*

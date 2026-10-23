@@ -8,6 +8,9 @@ services:
       context: ../..
       dockerfile: Dockerfile
     restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
     # loopback only, for local smoke tests
     ports:
       - "127.0.0.1:3101:3000"
