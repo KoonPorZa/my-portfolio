@@ -4,7 +4,9 @@ import Script from "next/script";
 import { usePathname } from "next/navigation";
 
 const beaconToken = process.env.NEXT_PUBLIC_CF_BEACON_TOKEN?.trim() ?? "";
-const liveViewerPathPattern = /^\/trip\/\d+\/live(?:\/.*)?$/;
+// The trip pages are gone, but old share links (/trip/NNN/live?t=<token>) can still
+// reach the 404 page. Keep the beacon off every /trip path so the token never reaches it.
+const liveViewerPathPattern = /^\/trip(?:\/.*)?$/;
 
 export function CfWebAnalytics() {
   const pathname = usePathname();
