@@ -1,9 +1,20 @@
+"use client";
+
 import Script from "next/script";
+import { usePathname } from "next/navigation";
 
 const beaconToken = process.env.NEXT_PUBLIC_CF_BEACON_TOKEN?.trim() ?? "";
+// The trip pages are gone, but old share links (/trip/NNN/live?t=<token>) can still
+// reach the 404 page. Keep the beacon off every /trip path so the token never reaches it.
+const liveViewerPathPattern = /^\/trip(?:\/.*)?$/;
 
 export function CfWebAnalytics() {
-  if (!beaconToken) {
+  const pathname = usePathname();
+
+  // Fail closed: usePathname() is null during SSR, so render only once we
+  // positively know a non-live path. This guarantees the beacon is never in
+  // the SSR HTML of the token-bearing viewer page (/trip/NNN/live?t=...).
+  if (!beaconToken || !pathname || isLiveViewerPath(pathname)) {
     return null;
   }
 
@@ -16,4 +27,10 @@ export function CfWebAnalytics() {
       strategy="afterInteractive"
     />
   );
+}
+
+function isLiveViewerPath(pathname: string | null): boolean {
+  // Viewer links are opened directly, not SPA nav; Cloudflare automatic injection
+  // must stay OFF so the beacon never sees the viewer token.
+  return pathname ? liveViewerPathPattern.test(pathname) : false;
 }
