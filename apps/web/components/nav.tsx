@@ -1,18 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import { nav as navItems, profile } from "@/lib/data";
 
 export function Nav() {
-  const pathname = usePathname();
   const [active, setActive] = useState("home");
   const [scrolled, setScrolled] = useState(false);
-  const hideNav = pathname.startsWith("/trip/");
 
   useEffect(() => {
-    if (hideNav) return;
-
     const ids = navItems.map((n) => n.href.slice(1));
     const sections = ids
       .map((id) => document.getElementById(id))
@@ -35,9 +30,7 @@ export function Nav() {
       io.disconnect();
       window.removeEventListener("scroll", onScroll);
     };
-  }, [hideNav]);
-
-  if (hideNav) return null;
+  }, []);
 
   return (
     <header
