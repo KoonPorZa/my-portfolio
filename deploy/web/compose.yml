@@ -1,0 +1,16 @@
+# Self-host web container. The Cloudflare tunnel container joins this network
+# and reaches the app as http://portfolio-web:3000 (no published port needed).
+name: portfolio
+services:
+  web:
+    container_name: portfolio-web
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # loopback only, for local smoke tests
+    ports:
+      - "127.0.0.1:3101:3000"
